@@ -45,6 +45,10 @@ const SMALL_BULB = BULB_PROFILE.map((p) => V2(p.x * 0.82, p.y * 0.82));
 const CUP_PROFILE = [
   V2(0.0, 0), V2(0.04, 0), V2(0.048, 0.015), V2(0.052, 0.08), V2(0.058, 0.1), V2(0.05, 0.092),
 ];
+// 钟形灯罩（车削）：底口宽、向上收窄。罩住灯泡——把"裸灯泡+大圆盘光晕"的棒棒糖换成有体量的灯。
+const SHADE_PROFILE = [
+  V2(0.205, 0), V2(0.2, 0.03), V2(0.165, 0.1), V2(0.11, 0.19), V2(0.06, 0.265), V2(0.045, 0.285),
+];
 
 function Lantern({ position, light = false }: { position: THREE.Vector3; light?: boolean }) {
   return (
@@ -52,30 +56,42 @@ function Lantern({ position, light = false }: { position: THREE.Vector3; light?:
       {/* 车削灯杆 */}
       <mesh position={[0, 0, 0]} castShadow>
         <latheGeometry args={[POST_PROFILE, 18]} />
-        <meshStandardMaterial color={PALETTE.brass} roughness={0.32} metalness={1} />
+        <meshStandardMaterial color={PALETTE.brass} roughness={0.36} metalness={0.9} />
       </mesh>
-      {/* 顶部铜配件 */}
-      <mesh position={[0, 1.92, 0]} castShadow>
-        <cylinderGeometry args={[0.05, 0.07, 0.06, 18]} />
-        <meshStandardMaterial color={PALETTE.brass} roughness={0.3} metalness={1} />
+      {/* 顶部铜枝（灯罩由此悬下）*/}
+      <mesh position={[0, 2.18, 0]} castShadow>
+        <cylinderGeometry args={[0.022, 0.03, 0.18, 12]} />
+        <meshStandardMaterial color={PALETTE.brass} roughness={0.3} metalness={0.95} />
       </mesh>
-      {/* 泪滴灯泡（发光） */}
-      <mesh position={[0, 1.98, 0]}>
-        <latheGeometry args={[BULB_PROFILE, 20]} />
+      {/* 灯泡（小、暖，藏在罩内）*/}
+      <mesh position={[0, 2.0, 0]}>
+        <sphereGeometry args={[0.062, 16, 12]} />
         <meshStandardMaterial
           color={PALETTE.lampCore}
           emissive={new THREE.Color(PALETTE.lampWarm)}
-          emissiveIntensity={1.5}
-          roughness={0.5}
+          emissiveIntensity={2.4}
+          roughness={0.4}
           toneMapped={false}
         />
       </mesh>
-      {/* 空气里的柔和光晕 */}
-      <mesh position={[0, 2.05, 0]}>
-        <sphereGeometry args={[0.4, 16, 16]} />
-        <meshBasicMaterial color={PALETTE.lampWarm} transparent opacity={0.1} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+      {/* 钟形灯罩：底口朝下、罩住灯泡；双面——外壳收冷月光，内壁被灯泡照得发暖（一盏"有体量的灯"）*/}
+      <mesh position={[0, 1.9, 0]} castShadow>
+        <latheGeometry args={[SHADE_PROFILE, 28]} />
+        <meshStandardMaterial
+          color={PALETTE.paperWarm}
+          emissive={new THREE.Color(PALETTE.lampWarm)}
+          emissiveIntensity={0.45}
+          roughness={0.72}
+          metalness={0}
+          side={THREE.DoubleSide}
+        />
       </mesh>
-      {light && <pointLight position={[0, 2.0, 0]} color={PALETTE.lampWarm} intensity={6} distance={9} decay={2} />}
+      {/* 收紧的柔光晕（贴着罩口一小团，不再是大圆盘）*/}
+      <mesh position={[0, 1.92, 0]}>
+        <sphereGeometry args={[0.17, 16, 12]} />
+        <meshBasicMaterial color={PALETTE.lampWarm} transparent opacity={0.12} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+      </mesh>
+      {light && <pointLight position={[0, 1.92, 0]} color={PALETTE.lampWarm} intensity={6} distance={9} decay={2} />}
     </group>
   );
 }
