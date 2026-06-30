@@ -191,6 +191,13 @@ function BookWallStructure() {
           </Edges>
         </RoundedBox>
       ))}
+      {/* 背板：一整片沿弧的曲面背墙，封住所有缝隙（墙成墙，书不再浮在星海里）*/}
+      <mesh position={[0, BOOKWALL.height / 2, 0]} receiveShadow>
+        <cylinderGeometry
+          args={[BOOKWALL.radius + 0.34, BOOKWALL.radius + 0.34, BOOKWALL.height + 0.2, 64, 1, true, Math.PI / 2 - BOOKWALL.a1, BOOKWALL.a1 - BOOKWALL.a0]}
+        />
+        <meshStandardMaterial color={"#1c130c"} roughness={0.92} metalness={0.02} side={THREE.DoubleSide} />
+      </mesh>
       {shelves.map((s, i) => (
         <RoundedBox key={`s${i}`} args={[s.w, 0.05, 0.56]} radius={0.012} smoothness={2} position={s.p} rotation={[0, s.ry, 0]}>
           <meshStandardMaterial color={PALETTE.wood} roughness={0.8} />
@@ -322,12 +329,17 @@ function PedestalBases() {
             <torusGeometry args={[p.r * 0.62, 0.012, 10, 32]} />
             <meshStandardMaterial color={PALETTE.brass} roughness={0.3} metalness={1} />
           </mesh>
-          {/* 顶台暖光圈 */}
+          {/* 顶台暖光圈：收敛成一道细暖鞘，别再像发光"飞碟环" */}
           <mesh position={[0, p.h + 0.175, 0]}>
-            <torusGeometry args={[p.r * 0.5, 0.012, 8, 28]} />
-            <meshStandardMaterial color={PALETTE.lampCore} emissive={new THREE.Color(PALETTE.lampWarm)} emissiveIntensity={1.4} toneMapped={false} />
+            <torusGeometry args={[p.r * 0.5, 0.008, 8, 28]} />
+            <meshStandardMaterial color={PALETTE.lampCore} emissive={new THREE.Color(PALETTE.lampWarm)} emissiveIntensity={0.6} toneMapped={false} />
           </mesh>
-          <pointLight position={[0, p.h + 0.45, 0]} color={PALETTE.lampWarm} intensity={1.5} distance={2.8} decay={2} />
+          {/* 接水柔光：基座落在水面处一小团暖光，给"立在水上"的落地感 */}
+          <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <circleGeometry args={[p.r * 1.5, 24]} />
+            <meshBasicMaterial color={PALETTE.lampWarm} transparent opacity={0.06} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+          </mesh>
+          <pointLight position={[0, p.h + 0.45, 0]} color={PALETTE.lampWarm} intensity={1.3} distance={2.8} decay={2} />
         </group>
       ))}
     </group>
