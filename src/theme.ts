@@ -1,0 +1,111 @@
+// ─────────────────────────────────────────────────────────────────────────
+// 主题 + 布局：整个「潮汐图书馆」的"唯一几何真相源"。
+//
+// 美学：潮汐图书馆 / The Tide Library（见 DECISIONS.md）。
+//   一座暖灯的读书回廊，立在一片只有几厘米深、却完美映出整片星空的镜面水上。
+//   冷的水与天（午夜蓝 / 银）× 暖的灯与书（琥珀）。脚步在星海倒影上荡开涟漪。
+//
+// LAYOUT 同时被三处读取：场景渲染（Gallery/Water/...）、漫游碰撞与高度（walk.ts）、
+// 相机聚焦点（PlayerControls）。三者读同一份常量 → 几何、碰撞、镜头永不脱节。
+//
+// 坐标：Y 向上，水面基准 y≈0（你"走在水上"）。
+//   +Z = 入水甬道（出生点，朝 -Z 望进回廊）。-Z = 后方抬高的观星台（上层）。
+//   ±X = 两侧回廊：-X 书墙（思考），+X 浮岛陈列（物件）。中央＝镜面广场。
+// ─────────────────────────────────────────────────────────────────────────
+
+export type Vec3 = [number, number, number];
+
+export const PALETTE = {
+  // 水与天：冷
+  deepWater: "#03040c",
+  waterTint: "#0a1430",
+  skyZenith: "#02030a",
+  skyHorizon: "#152647",
+  star: "#e7ecff",
+  milky: "#5666a8",
+  aurora: "#2fae9e", // 极地青，极克制的水平辉光
+  // 灯与书：暖
+  lampWarm: "#ffb257",
+  lampCore: "#ffe9c2",
+  glowAmber: "#ff9b46",
+  brass: "#caa15a",
+  paperWarm: "#e9d6a6",
+  // 材质
+  wood: "#241910",
+  woodWarm: "#3a2718",
+  stone: "#10141f",
+  stoneLit: "#1b2333",
+} as const;
+
+// 视高 / 出生 ──────────────────────────────────────────────────────────────
+export const EYE = 1.6;
+export const WATER_Y = 0.0; // 水面基准（潮汐在此上下微动）
+export const SPAWN: Vec3 = [0, 0, 6.6]; // 入水甬道，面朝 -Z 望进回廊
+
+// 镜面广场（可行走的水盘）───────────────────────────────────────────────────
+export const R_COURT = 8.0; // 可行走半径（站在水上的圆形广场）
+export const R_RING = 8.7; // 回廊 / 书墙所在半径（刚好在可行走区外）
+
+// 观星台（上层）：后方 -Z 抬高的平台，木梯连通 ──────────────────────────────
+export const DECK_Y = 1.45; // 台面高度
+export const DECK = { x0: -3.2, x1: 3.2, zFar: -10.8, zNear: -8.1 } as const; // 台面足迹
+export const STEPS = { x0: -2.0, x1: 2.0, zTop: -8.1, zBottom: -6.5, count: 8 } as const; // 由台面前缘(-8.1,y=DECK_Y)下到水面(-6.5,y=0)
+export const STEP_RISE = DECK_Y / STEPS.count; // ≈0.181
+export const STEP_RUN = (STEPS.zBottom - STEPS.zTop) / STEPS.count; // >0，每级向 +Z 退
+
+// 潮汐（水面缓慢呼吸；也驱动"沉字浮起"）──────────────────────────────────────
+export const TIDE_AMP = 0.055; // 水面上下振幅（米）
+export const TIDE_PERIOD = 135; // 一个涨落周期（秒）
+/** 给定经过时间，返回水面相对基准的高度偏移。 */
+export function tideOffset(t: number): number {
+  return Math.sin((t / TIDE_PERIOD) * Math.PI * 2) * TIDE_AMP;
+}
+/** 归一化潮位 0..1（0=最低潮，1=最高潮），驱动沉字透明度等。 */
+export function tidePhase(t: number): number {
+  return 0.5 + 0.5 * Math.sin((t / TIDE_PERIOD) * Math.PI * 2);
+}
+
+// 星空穹顶 ──────────────────────────────────────────────────────────────────
+export const DOME_R = 64;
+export const STAR_COUNT = 7200;
+
+// 关键陈设点 ────────────────────────────────────────────────────────────────
+// 写作台（思考区，立在 -X 书墙前的水上）—— 写下的思考会"沉入水中"。
+export const LECTERN: Vec3 = [-4.3, 0, 1.4];
+// 中央：一圈低烛 + 一处沉在水底的星座（纯氛围，可不踩）。
+export const COURT_CENTER: Vec3 = [0, 0, -0.5];
+// 留声机（影音区，在观星台上）—— 空间化音乐声源。
+export const GRAMOPHONE: Vec3 = [0, DECK_Y, -9.4];
+
+// 功能区锚点（相机聚焦 + 准心热点）。position = 看向的中心，ry = 正面朝向。
+// 三个核心区沿用同一套数据契约（id/type 不变），只是被重新"皮肤化"到潮汐图书馆：
+//   bookshelf → -X 整面书墙 + 写作台（思考/文字）
+//   objects   → +X 浮在水上的发光陈列岛（珍视的物件）
+//   record    → 观星台上的留声机（影音）
+export const ZONE_ANCHORS = {
+  "zone-bookshelf": { position: [-6.4, 2.05, -0.5] as Vec3, ry: Math.PI / 2 }, // -X 书墙，正面朝 +X（court）
+  "zone-objects": { position: [6.3, 1.15, 0.4] as Vec3, ry: -Math.PI / 2 }, // +X 浮岛
+  "zone-record": { position: [0, DECK_Y + 0.95, -9.0] as Vec3, ry: 0 }, // 观星台留声机，朝 +Z 望向镜面
+} as const;
+
+// 书墙（思考）：沿 -X 一段圆弧排布的高书架。角度区间（绕 Y，0=+X 方向，逆时针）。
+export const BOOKWALL = {
+  radius: R_RING,
+  a0: Math.PI * 0.62, // 起始角
+  a1: Math.PI * 1.38, // 结束角（≈ -X 半侧的圆弧）
+  height: 4.2,
+  shelves: 6,
+} as const;
+
+// 浮岛陈列（物件）：+X 一侧水面上若干发光基座（立在水上的小岛）。
+// 同时被 Gallery（渲染）与 walk.ts（碰撞）读取 → 看到的岛就是会挡路的岛。
+export const PEDESTALS: { pos: Vec3; r: number; h: number }[] = [
+  { pos: [5.4, 0, 2.3], r: 0.62, h: 0.9 },
+  { pos: [6.3, 0, 0.0], r: 0.66, h: 1.15 },
+  { pos: [5.3, 0, -2.2], r: 0.6, h: 0.8 },
+  { pos: [3.7, 0, 3.6], r: 0.55, h: 0.7 },
+  { pos: [3.9, 0, -3.4], r: 0.55, h: 0.7 },
+];
+
+// 心境 → 氛围基调（沿用类型以备"生长"；本主题固定为冷夜 + 暖灯）
+export type Mood = "warm" | "cool" | "neutral" | "rainy";

@@ -1,0 +1,1048 @@
+/* ══════════════════════════════════════════════════════
+   潮汐图书馆 · 印刷体系 · index.css
+   审美方向：铅字版书房——题词页、索引页、版权条
+   ══════════════════════════════════════════════════════ */
+
+:root {
+  /* ── 字体栈 ── */
+  /* 华文中宋（华文宋体）: 正文书册衬线，比 SimSun 更有弹性 */
+  --serif:  "Cambria", "Georgia", "Times New Roman", serif;
+  --cjk:    "STZhongsong", "STSong", "Noto Serif SC", "Songti SC", "SimSun", serif;
+  /* 华文楷体: 仅用于诗意的单行引文 */
+  --cjk-kai: "STKaiti", "STZhongsong", "STSong", "SimSun", serif;
+  /* 华文仿宋: 仅用于面板眉题小字 */
+  --cjk-fs:  "STFangsong", "STSong", "SimSun", serif;
+  /* 机械小字: 用 Courier New 替换 Inter，更有打字机/活字气质 */
+  --mech:    "Courier New", "Courier", "Lucida Console", monospace;
+
+  /* ── 纸墨调色板（暖纸·冷星）── */
+  --paper:       #13100c;
+  --paper-raised:#191510;
+  --paper-edge:  #0c0a07;
+  --ink:         #e6ddd0;
+  --ink-2:       #bfb29c;
+  --ink-3:       #857864;
+  --ink-4:       #504840;
+  --amber:       #b8904f;
+  --amber-ink:   #d9b47a;
+  --danger:      #a85a40;
+
+  /* ── 发丝线 ── */
+  --rule:        rgba(230, 221, 208, 0.10);
+  --rule-strong: rgba(230, 221, 208, 0.20);
+
+  /* ── 动效 ── */
+  --ease:    cubic-bezier(0.22, 0.61, 0.36, 1);
+  --t-quick: 200ms;
+  --t-slow:  860ms;
+
+  color-scheme: dark;
+}
+
+/* ── 光学字距 ── */
+* {
+  box-sizing: border-box;
+  font-optical-sizing: auto;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  font-family: var(--cjk);
+  color: var(--ink);
+  background: var(--paper-edge);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.app {
+  position: fixed;
+  inset: 0;
+}
+.app canvas {
+  display: block;
+  touch-action: none;
+}
+
+/* ── 落入提示 ── */
+.boot {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--paper-edge);
+  animation: fade-out 0.6s ease forwards;
+  pointer-events: none;
+}
+.boot-text {
+  font-family: var(--mech);
+  color: var(--ink-3);
+  letter-spacing: 0.24em;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+@keyframes fade-out {
+  to { opacity: 0; }
+}
+
+/* ══════════════════════════════════════════════
+   入场遮罩 · 题词页（Frontispiece）
+   左侧对齐、排版基线，不是居中 landing page
+   ══════════════════════════════════════════════ */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  /* 不用 place-items:center — 用 flex+padding 控制左偏 */
+  pointer-events: auto;
+}
+.enter-overlay {
+  /* 径向暗角从左上角投来，不对称 */
+  background:
+    radial-gradient(ellipse 80% 100% at 20% 40%, #181310 0%, transparent 70%),
+    radial-gradient(ellipse 120% 80% at 80% 80%, #05070a 0%, transparent 60%),
+    #0a0806;
+}
+
+/* 题词页主体：左对齐，书脊偏移 */
+.enter-card {
+  padding: 0 0 0 max(60px, 8vw);
+  max-width: 560px;
+  width: 100%;
+}
+
+/* 子节点交错出现 */
+.enter-card > * {
+  opacity: 0;
+  transform: translateY(10px);
+  animation: entry-rise var(--t-slow) var(--ease) forwards;
+}
+.enter-card > *:nth-child(1) { animation-delay:  60ms; }
+.enter-card > *:nth-child(2) { animation-delay: 180ms; }
+.enter-card > *:nth-child(3) { animation-delay: 280ms; }
+.enter-card > *:nth-child(4) { animation-delay: 400ms; }
+.enter-card > *:nth-child(5) { animation-delay: 540ms; }
+.enter-card > *:nth-child(6) { animation-delay: 680ms; }
+
+@keyframes entry-rise {
+  to { opacity: 1; transform: none; }
+}
+
+/* 眉题：华文仿宋小字，活字感 */
+.brand-eyebrow {
+  display: block;
+  font-family: var(--cjk-fs);
+  font-size: 0.82rem;
+  letter-spacing: 0.28em;
+  color: var(--ink-3);
+  margin: 0 0 18px;
+}
+
+/* 大标题"灵境" — 华文中宋大字，题词页主角 */
+.brand-xl {
+  font-family: var(--cjk);
+  font-size: clamp(4.5rem, 13vw, 8rem);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  /* 单像素压印感 */
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.95), 1px 0 0 rgba(0, 0, 0, 0.4);
+  margin: 0;
+  line-height: 1;
+  /* 竖写汉字传统：字形稍高挑 */
+  font-stretch: normal;
+}
+
+/* 标题下方水平实线 — 替代虚线 rule，更像版权页分隔 */
+.enter-rule {
+  width: 64px;
+  height: 1px;
+  background: var(--amber);
+  margin: 24px 0 0;
+  opacity: 0.55;
+}
+
+/* 说明文段 — 华文楷体，一段诗意的注解 */
+.enter-desc {
+  font-family: var(--cjk-kai);
+  font-size: 0.97rem;
+  line-height: 2.1;
+  color: var(--ink-2);
+  max-width: 26em;
+  margin: 22px 0 0;
+  /* 左侧微缩进 — 像散文首行 */
+  text-indent: 2em;
+}
+
+/* 拉丁副行 — Courier New，出版信息字感 */
+.brand-sub {
+  display: block;
+  font-family: var(--mech);
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  margin-top: 28px;
+}
+
+/* 进入按钮 — 左对齐文字型，下划线从左端展开 */
+.enter-btn {
+  display: inline-block;
+  position: relative;
+  font-family: var(--cjk);
+  font-size: 1.05rem;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  color: var(--ink);
+  background: none;
+  border: none;
+  padding: 4px 0;
+  cursor: pointer;
+  margin-top: 36px;
+  border-bottom: 1px solid var(--rule-strong);
+  border-radius: 0;
+  transition: color var(--t-quick) var(--ease), border-color var(--t-quick) var(--ease);
+}
+.enter-btn::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 100%;
+  bottom: -1px;
+  height: 1px;
+  background: var(--amber-ink);
+  transition: right var(--t-quick) var(--ease);
+}
+.enter-btn:hover {
+  color: var(--amber-ink);
+  border-color: transparent;
+}
+.enter-btn:hover::after {
+  right: 0;
+}
+
+/* 键位提示 — 版权条小字 */
+.enter-hint {
+  font-family: var(--mech);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  color: var(--ink-4);
+  margin-top: 14px;
+}
+
+/* ══════════════════════════════════════════════
+   HUD 总层
+   ══════════════════════════════════════════════ */
+.hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.hud > * {
+  pointer-events: auto;
+}
+
+/* ── 准心 ── */
+.crosshair-wrap {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* 静态：1px 发丝圆圈，无光晕，无填色 */
+.crosshair {
+  width: 20px;
+  height: 20px;
+  margin: 0 auto;
+  border-radius: 50%;
+  border: 1px solid rgba(230, 221, 208, 0.30);
+  background: transparent;
+  position: relative;
+  transition: width var(--t-quick) var(--ease),
+              height var(--t-quick) var(--ease),
+              border-color var(--t-quick) var(--ease);
+}
+
+/* 远处看到了、但还够不着：准心微亮一点，给"那边有东西"的反馈，不收缩、不出刻度 */
+.crosshair.spotted {
+  border-color: rgba(231, 222, 209, 0.66);
+}
+
+/* 对准目标时：收缩 + 四个刻度线 */
+.crosshair.active {
+  width: 12px;
+  height: 12px;
+  border-color: var(--amber);
+}
+.crosshair.active::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: -7px;
+  width: 1px;
+  height: 4px;
+  background: var(--amber);
+}
+.crosshair.active::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: -7px;
+  width: 1px;
+  height: 4px;
+  background: var(--amber);
+}
+
+.crosshair-wrap .ch-tick-lr {
+  display: none;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.crosshair.active ~ .ch-tick-lr {
+  display: block;
+}
+.ch-tick-lr::before,
+.ch-tick-lr::after {
+  content: "";
+  position: absolute;
+  top: -1px;
+  width: 4px;
+  height: 1px;
+  background: var(--amber);
+}
+.ch-tick-lr::before { right: calc(6px + 3px); }
+.ch-tick-lr::after  { left:  calc(6px + 3px); }
+
+/* 准心标签 */
+.reticle-label {
+  margin-top: 26px;
+  text-align: center;
+  opacity: 0;
+  animation: fade-in var(--t-quick) var(--ease) forwards;
+}
+/* 远处只是"看到"：用更暗的字色跟"够得着"区分（不动 opacity，避免和上面的渐显动画打架）*/
+.reticle-label.far .rl-zone { color: var(--ink-3); }
+.reticle-label.far .rl-hint { color: var(--ink-4); }
+.reticle-label .rl-zone {
+  display: block;
+  font-family: var(--cjk);
+  font-size: 0.9rem;
+  color: var(--ink);
+  text-shadow: 0 1px 6px rgba(0,0,0,0.9), 0 0 20px rgba(0,0,0,0.7);
+}
+.reticle-label .rl-hint {
+  display: block;
+  font-family: var(--mech);
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-top: 4px;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.9);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── 漫游态提示 ── */
+/* 左下角·边注气质，不要居中 */
+.controls-hint {
+  position: absolute;
+  bottom: 20px;
+  left: max(16px, 2vw);
+  font-family: var(--mech);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-4);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* ── 通知条 ── */
+.notice {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--paper-raised);
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  padding: 6px 16px;
+  font-family: var(--mech);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+  pointer-events: none;
+}
+
+/* ══════════════════════════════════════════════
+   退出按钮 · 右上角
+   ══════════════════════════════════════════════ */
+.back {
+  position: absolute;
+  top: 22px;
+  right: 24px;
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 4px 0;
+  cursor: pointer;
+}
+
+.back-chevron {
+  font-family: var(--serif);
+  font-size: 1rem;
+  color: var(--ink-4);
+  line-height: 1;
+  transition: color var(--t-quick) var(--ease);
+}
+.back-label {
+  font-family: var(--cjk-fs);
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 1px;
+  transition: color var(--t-quick) var(--ease),
+              border-color var(--t-quick) var(--ease);
+}
+.back-keycap {
+  font-family: var(--mech);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 1px 4px 2px;
+  transition: color var(--t-quick) var(--ease),
+              border-color var(--t-quick) var(--ease);
+}
+
+.back:hover .back-chevron,
+.back:hover .back-label {
+  color: var(--amber-ink);
+}
+.back:hover .back-label {
+  border-bottom-color: var(--amber-ink);
+}
+.back:hover .back-keycap {
+  color: var(--amber-ink);
+  border-color: var(--amber);
+}
+
+/* 点击退出的全屏透明幕布 */
+.focus-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: transparent;
+  cursor: default;
+}
+
+/* ══════════════════════════════════════════════
+   侧栏面板 · 书页
+   有轻微纸纹——CSS 多层径向渐变模拟
+   ══════════════════════════════════════════════ */
+.dock {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(400px, 94vw);
+  display: flex;
+  z-index: 2;
+  animation: panel-enter var(--t-slow) var(--ease) both;
+}
+.dock.right {
+  left: auto;
+  right: 0;
+}
+
+@keyframes panel-enter {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: none; }
+}
+.dock.right {
+  animation-name: panel-enter-right;
+}
+@keyframes panel-enter-right {
+  from { opacity: 0; transform: translateX(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* 书页本体 — 带极细纸纹的暗纸面 */
+.panel {
+  width: 100%;
+  /* 多层：底色 + 竖向纸纹渐变（模拟轻微纤维感）+ 顶/底暗角 */
+  background:
+    /* 顶部轻压 */
+    linear-gradient(to bottom, rgba(0,0,0,0.18) 0%, transparent 12%),
+    /* 底部轻压 */
+    linear-gradient(to top, rgba(0,0,0,0.22) 0%, transparent 18%),
+    /* 极细竖纹（印刷用纸的纤维方向）*/
+    repeating-linear-gradient(
+      90deg,
+      transparent 0px,
+      transparent 3px,
+      rgba(0,0,0,0.018) 3px,
+      rgba(0,0,0,0.018) 4px
+    ),
+    /* 主纸色 */
+    linear-gradient(175deg, var(--paper-raised) 0%, var(--paper) 60%, var(--paper-edge) 100%);
+  border-right: 1px solid var(--rule);
+  box-shadow: 4px 0 40px -8px rgba(0, 0, 0, 0.65);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── 面板题头 ── */
+/* 非对称：左侧 44px 书脊余量，像精装书护封 */
+.panel-masthead {
+  padding: 48px 32px 0 44px;
+  border-bottom: 1px solid var(--rule);
+  flex: none;
+}
+
+/* 眉题：华文仿宋，更有书册活字气质 */
+.panel-eyebrow {
+  font-family: var(--cjk-fs);
+  font-size: 0.72rem;
+  letter-spacing: 0.24em;
+  color: var(--ink-3);
+  margin: 0 0 10px;
+  /* 不要 uppercase — 汉字大写失去笔形 */
+}
+
+/* 面板标题：华文中宋，偏大，设书名级别 */
+.panel-title {
+  font-family: var(--cjk);
+  font-size: 1.5rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+  margin: 0 0 20px;
+  /* 钻石形字距，在华文中宋下好看 */
+  line-height: 1.2;
+}
+
+/* ── 面板正文区 ── */
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 32px 36px 44px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-4) transparent;
+}
+.panel-body::-webkit-scrollbar { width: 2px; }
+.panel-body::-webkit-scrollbar-thumb { background: var(--ink-4); }
+
+/* 旁注 / 提示 — 华文楷体斜体感，像手写边注 */
+.panel-hint {
+  font-family: var(--cjk-kai);
+  font-size: 0.88rem;
+  line-height: 1.9;
+  color: var(--ink-3);
+  margin: 0;
+  /* 左侧细琥珀边 — 像页边批注 */
+  padding-left: 10px;
+  border-left: 2px solid rgba(184, 144, 79, 0.30);
+}
+
+/* ── 写字页（书页既视感）── */
+textarea,
+input[type="text"],
+input:not([type]) {
+  width: 100%;
+  font-family: var(--cjk);
+  font-size: 1rem;
+  line-height: 1.9;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--rule);
+  border-radius: 0;
+  padding: 0 0 8px;
+  resize: none;
+  outline: none;
+  transition: border-color var(--t-quick) var(--ease);
+}
+textarea::placeholder,
+input::placeholder {
+  color: var(--ink-4);
+  font-style: italic;
+  font-family: var(--cjk-kai);
+}
+textarea:focus,
+input:focus {
+  border-bottom-color: var(--amber);
+}
+
+input[type="color"] {
+  width: 26px;
+  height: 20px;
+  padding: 1px;
+  background: none;
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+/* ── 字段标签 ── */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.field > span {
+  font-family: var(--mech);
+  font-size: 0.66rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* ── 行布局 ── */
+.row {
+  display: flex;
+  gap: 18px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+/* ── 错误文字 ── */
+.error {
+  font-family: var(--mech);
+  color: var(--danger);
+  font-size: 0.76rem;
+}
+
+/* ══════════════════════════════════════════════
+   按钮系统 · 文字排版型
+   ══════════════════════════════════════════════ */
+
+/* 重置全局按钮基础 */
+button {
+  font-family: var(--mech);
+  font-size: 0.76rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  cursor: pointer;
+  transition: color var(--t-quick) var(--ease);
+}
+button:disabled {
+  opacity: 0.30;
+  cursor: default;
+}
+
+/* 主操作 — 华文中宋，稍大，底线从左端展开 */
+button.primary {
+  font-family: var(--cjk);
+  font-size: 0.9rem;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+  position: relative;
+  padding-bottom: 2px;
+  border-bottom: 1px solid var(--rule-strong);
+}
+button.primary::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 100%;
+  bottom: -1px;
+  height: 1px;
+  background: var(--amber-ink);
+  transition: right var(--t-quick) var(--ease);
+}
+button.primary:hover:not(:disabled) {
+  color: var(--amber-ink);
+  border-bottom-color: transparent;
+}
+button.primary:hover:not(:disabled)::after {
+  right: 0;
+}
+
+/* 次操作 */
+button.secondary {
+  font-family: var(--cjk-fs);
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+  padding-bottom: 2px;
+  border-bottom: 1px solid transparent;
+}
+button.secondary:hover:not(:disabled) {
+  color: var(--ink-2);
+  border-bottom-color: var(--rule-strong);
+}
+
+/* 危险操作 */
+button.danger {
+  font-family: var(--cjk-fs);
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-4);
+  padding-bottom: 2px;
+  border-bottom: 1px solid transparent;
+  transition: color var(--t-quick) var(--ease), border-color var(--t-quick) var(--ease);
+}
+button.danger:hover:not(:disabled) {
+  color: var(--danger);
+  border-bottom-color: rgba(168, 90, 64, 0.35);
+}
+
+/* chip / 形状选择器 — 文字 toggle，无填色 */
+button.chip {
+  font-family: var(--mech);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
+  padding: 2px 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  background: none;
+}
+button.chip.active {
+  color: var(--amber-ink);
+  border-bottom-color: var(--amber);
+}
+button.chip:hover:not(.active) {
+  color: var(--ink-2);
+}
+
+/* link 样式按钮 */
+button.link {
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  flex: 1;
+  color: var(--ink-3);
+  font-size: 0.76rem;
+}
+button.link:hover { color: var(--ink); }
+
+/* icon 按钮 */
+button.icon {
+  background: none;
+  border: none;
+  padding: 2px 6px;
+  color: var(--ink-3);
+}
+button.icon:hover { color: var(--ink); }
+
+/* ══════════════════════════════════════════════
+   列表 · 印刷索引
+   ══════════════════════════════════════════════ */
+.list {
+  display: flex;
+  flex-direction: column;
+}
+.list-head {
+  font-family: var(--mech);
+  font-size: 0.66rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 0;
+}
+.empty {
+  font-family: var(--cjk-kai);
+  font-size: 0.85rem;
+  color: var(--ink-4);
+  padding: 16px 0;
+}
+
+/* 索引行 */
+.list-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--rule);
+  border-radius: 0;
+  /* 非对称缩进：左侧书脊余量 */
+  padding: 9px 0 9px 12px;
+  position: relative;
+  transition: none;
+  cursor: pointer;
+}
+
+/* 左侧琥珀刻度 */
+.list-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 11px;
+  bottom: 11px;
+  width: 1px;
+  background: var(--amber);
+  opacity: 0;
+  transition: opacity var(--t-quick) var(--ease);
+}
+.list-item:hover::before,
+.list-item.active::before {
+  opacity: 1;
+}
+
+.list-item .title {
+  font-family: var(--cjk);
+  font-size: 0.92rem;
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color var(--t-quick) var(--ease);
+}
+.list-item:hover .title {
+  color: var(--ink);
+}
+.list-item.active .title {
+  color: var(--amber-ink);
+}
+
+.list-item .date {
+  font-family: var(--mech);
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-4);
+  white-space: nowrap;
+  flex: none;
+}
+
+/* 标签（RecentPanel 条目类型）*/
+.list-item .tag {
+  font-family: var(--mech);
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  color: var(--ink-4);
+  white-space: nowrap;
+  flex: none;
+}
+.list-item.active .tag {
+  color: var(--amber);
+}
+
+/* ══════════════════════════════════════════════
+   底部控制簇 · 版权页条（Colophon Strip）
+   两层：左边是播放/音量，右边是工具；用绝对定位分开
+   ══════════════════════════════════════════════ */
+.dock-controls {
+  position: absolute;
+  left: max(16px, 2vw);
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  pointer-events: auto;
+  max-width: 72vw;
+}
+
+/* 分隔竖线 */
+.ctl-divider {
+  width: 1px;
+  height: 12px;
+  background: var(--rule);
+  margin: 0 12px;
+  flex: none;
+}
+
+/* 控制项文字 */
+.ctl {
+  font-family: var(--mech);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  color: var(--ink-4);
+  padding: 0;
+  border: none;
+  background: none;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  white-space: nowrap;
+  transition: color var(--t-quick) var(--ease), border-color var(--t-quick) var(--ease);
+}
+.ctl:hover {
+  color: var(--ink-2);
+  border-bottom-color: var(--rule);
+}
+.ctl.on {
+  color: var(--amber-ink);
+  border-bottom-color: var(--amber);
+  background: none;
+}
+.ctl.on:hover {
+  border-bottom-color: var(--amber-ink);
+}
+
+/* 心境眉题 */
+.mood-eyebrow {
+  font-family: var(--mech);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  white-space: nowrap;
+  cursor: default;
+}
+
+/* 心境切换组 */
+.moods {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ══════════════════════════════════════════════
+   黑胶唱片 now-playing（RecordPanel 用）
+   ══════════════════════════════════════════════ */
+.now-playing {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.np-disc {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex: none;
+  /* 近黑唱片：三圈槽纹 */
+  background: #0c0a08;
+  border: 1px solid rgba(230, 221, 208, 0.12);
+  box-shadow:
+    inset 0 0 0 8px #0c0a08,
+    inset 0 0 0 10px rgba(230, 221, 208, 0.04),
+    inset 0 0 0 12px #0c0a08,
+    inset 0 0 0 14px rgba(230, 221, 208, 0.03),
+    inset 0 0 0 16px #0c0a08;
+  position: relative;
+}
+/* 中心孔 */
+.np-disc::after {
+  content: "";
+  position: absolute;
+  inset: 44%;
+  border-radius: 50%;
+  background: rgba(230, 221, 208, 0.12);
+}
+/* 播放中：8s 慢转 */
+.now-playing.on .np-disc {
+  animation: spin 8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.np-meta { flex: 1; min-width: 0; }
+.np-title {
+  font-family: var(--cjk);
+  font-size: 0.88rem;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.np-sub {
+  font-family: var(--mech);
+  font-size: 0.64rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-4);
+  margin-top: 3px;
+}
+.np-btn {
+  white-space: nowrap;
+}
+
+/* ══════════════════════════════════════════════
+   3D 内悬浮标签（zone-label，R3F Html 组件）
+   ══════════════════════════════════════════════ */
+.zone-label {
+  font-family: var(--mech);
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  padding: 3px 8px;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ══════════════════════════════════════════════
+   响应式
+   ══════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  .enter-card {
+    padding-left: 28px;
+    padding-right: 20px;
+  }
+  .controls-hint {
+    font-size: 0.64rem;
+  }
+  .dock { width: 100vw; }
+  .panel-masthead { padding: 44px 20px 0 28px; }
+  .panel-body { padding: 20px 20px 28px 28px; }
+}
+
+/* ══════════════════════════════════════════════
+   减少动效（可访问性）
+   ══════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  .enter-card > * {
+    animation: entry-rise-no-motion var(--t-slow) var(--ease) forwards;
+  }
+  @keyframes entry-rise-no-motion {
+    from { opacity: 0; }
+    to   { opacity: 1; transform: none; }
+  }
+  .dock { animation: panel-enter-no-motion var(--t-slow) var(--ease) both; }
+  @keyframes panel-enter-no-motion {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  .back { animation: none; }
+  .now-playing.on .np-disc { animation: none; }
+}
