@@ -4,7 +4,9 @@
 //
 // 模块级、定长环形缓冲（无分配、无 React），以 vec4(x, z, startTime, strength) 存。
 // ─────────────────────────────────────────────────────────────────────────
-export const RIPPLE_MAX = 14;
+// 容量需 ≥ 同时存活的涟漪数（生命期 × 生成频率）。脚步生成已放慢到每 ~1.2 单位一圈，
+// 生命 4.2s → 约 15 圈同时存活；取 20 留余量，避免动画中途被环形缓冲覆盖（那会"抽搐"）。
+export const RIPPLE_MAX = 20;
 // 每个涟漪 4 个分量：x, z, t0, strength。
 export const rippleData = new Float32Array(RIPPLE_MAX * 4);
 let head = 0;

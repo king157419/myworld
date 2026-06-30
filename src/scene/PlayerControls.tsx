@@ -287,7 +287,9 @@ export default function PlayerControls() {
     // 脚步涟漪：走在水面（脚下高度≈0）时，每跨过一步距离就在星海倒影上荡开一圈。
     if (moving && feet.current.y < 0.18) {
       rippleAccum.current += speed * dt;
-      if (rippleAccum.current > 0.5) {
+      if (rippleAccum.current > 1.2) {
+        // 放慢脚步涟漪节奏：原 0.5 单位一圈 ≈ 8.6/秒，会把 14 格环形缓冲在 ~1.6s 内冲掉、
+        // 让扩散中的环突然被覆盖（看着"抽搐"）。1.2 单位一圈 ≈ 3.6/秒，配 RIPPLE_MAX=20，环能放完整。
         rippleAccum.current = 0;
         spawnRipple(feet.current.x, feet.current.z, clock.elapsedTime, 0.95);
       }
