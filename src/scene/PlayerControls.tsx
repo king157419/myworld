@@ -263,11 +263,18 @@ export default function PlayerControls() {
     const speed = SPEED * (k.has("ShiftLeft") ? 1.7 : 1);
     const moving = len > 0.001;
 
-    const res = resolveMove(feet.current.y, feet.current.x + mx * speed * dt, feet.current.z + mz * speed * dt);
-    // 单层平滑：脚步直接较快跟随。去掉了原来的"脚步阻尼 → 相机再 lerp"二级平滑——那会让走动发糊、有输入延迟。
-    feet.current.x = THREE.MathUtils.damp(feet.current.x, res.x, 24, dt);
-    feet.current.z = THREE.MathUtils.damp(feet.current.z, res.z, 24, dt);
-    feet.current.y = THREE.MathUtils.damp(feet.current.y, res.y, 12, dt); // 上下台阶稍缓
+    const res = resolveMove(
+      feet.current.y,
+      feet.current.x,
+      feet.current.z,
+      feet.current.x + mx * speed * dt,
+      feet.current.z + mz * speed * dt,
+    );
+    // 水平：直接采用求解后的合法落点（不再 damp 去"追逐被夹目标"）——
+    // 那种追逐在低帧时会"走进去一半又被拉回"（空气墙弹回感）。每帧位移本就很小，1:1 即顺滑。
+    feet.current.x = res.x;
+    feet.current.z = res.z;
+    feet.current.y = THREE.MathUtils.damp(feet.current.y, res.y, 12, dt); // 高度仍平滑（上下台阶）
 
     bob.current += moving ? dt * speed * 2.2 : 0;
     const headbob = moving ? Math.sin(bob.current) * 0.02 : 0;

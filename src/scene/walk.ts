@@ -47,21 +47,33 @@ const COLLIDERS: [number, number, number][] = [
   [LECTERN[0], LECTERN[2], 0.5],
 ];
 
-function pushOut(x: number, z: number): [number, number] {
+// 沿障碍滑行（slide），而非径向弹出。弹出会在斜向擦碰时把人沿反方向"弹回来"
+// （实测复现：擦着浮岛走，切向位移会突然反向）。这里把本帧位移分解为"指向圆心(法向)"
+// 与"切向"两部分，只剔除指向圆心的那部分 → 贴着障碍顺滑绕行，不反弹。
+function slideColliders(fx: number, fz: number, x: number, z: number): [number, number] {
   let nx = x, nz = z;
   for (const [cx, cz, r] of COLLIDERS) {
+    const minR = r + RADIUS;
     const dx = nx - cx, dz = nz - cz;
-    const d = Math.hypot(dx, dz);
-    const min = r + RADIUS;
-    if (d < min) {
-      if (d > 1e-4) {
-        nx = cx + (dx / d) * min;
-        nz = cz + (dz / d) * min;
-      } else {
-        // 正好落在圆心（dx=dz=0）：任取一方向推出，避免卡死在岛心
-        nx = cx + min;
-        nz = cz;
-      }
+    if (Math.hypot(dx, dz) >= minR) continue; // 未侵入此障碍
+    // 接触法向取"来向一侧"（from 相对圆心），比从侵入点径向弹出更稳、不反弹
+    let onx = fx - cx, onz = fz - cz;
+    let ol = Math.hypot(onx, onz);
+    if (ol < 1e-4) { onx = dx; onz = dz; ol = Math.hypot(dx, dz); } // from 在圆心：退用目标方向
+    if (ol < 1e-4) { onx = 1; onz = 0; ol = 1; } // 全在圆心：任取一方向
+    onx /= ol; onz /= ol;
+    const mvx = nx - fx, mvz = nz - fz; // 本帧位移
+    const dot = mvx * onx + mvz * onz;
+    if (dot < 0) { // 朝障碍里走：剔除法向分量，只留切向（滑行）
+      nx = fx + (mvx - dot * onx);
+      nz = fz + (mvz - dot * onz);
+    }
+    // 滑完仍在体内（贴着面切向走）：径向顶到表面
+    const ax = nx - cx, az = nz - cz;
+    const ad = Math.hypot(ax, az);
+    if (ad < minR) {
+      if (ad > 1e-4) { nx = cx + (ax / ad) * minR; nz = cz + (az / ad) * minR; }
+      else { nx = cx + onx * minR; nz = cz + onz * minR; }
     }
   }
   return [nx, nz];
@@ -87,10 +99,13 @@ function clampToWalkable(x: number, z: number): [number, number] {
   return [x, z];
 }
 
-/** 给定上一帧位置与本帧期望水平位置，返回合法落点与脚下高度。 */
-export function resolveMove(prevY: number, wantX: number, wantZ: number): Resolved {
+/**
+ * 给定上一帧位置(from)与本帧期望水平位置(want)，返回合法落点与脚下高度。
+ * from 用于沿障碍滑行（不传则退化为原地求解：from=want）。
+ */
+export function resolveMove(prevY: number, fromX: number, fromZ: number, wantX: number, wantZ: number): Resolved {
   let [x, z] = clampToWalkable(wantX, wantZ);
-  [x, z] = pushOut(x, z);
-  [x, z] = clampToWalkable(x, z); // push 后可能越界，再夹一次
+  [x, z] = slideColliders(fromX, fromZ, x, z);
+  [x, z] = clampToWalkable(x, z); // 滑行后可能越界，再夹一次
   return { x, z, y: supportHeight(x, z, prevY) };
 }
