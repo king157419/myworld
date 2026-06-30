@@ -3,11 +3,11 @@ import { useFrame } from "@react-three/fiber";
 import { RoundedBox, Edges } from "@react-three/drei";
 import { RoundedBoxGeometry } from "three-stdlib";
 import * as THREE from "three";
+import GramophoneModel from "./GramophoneModel";
 import {
   BOOKWALL,
   DECK,
   DECK_Y,
-  GRAMOPHONE,
   LECTERN,
   PALETTE,
   PEDESTALS,
@@ -29,13 +29,6 @@ const BOOK_COLORS = ["#7d3b2e", "#3f5a46", "#6b5630", "#34465f", "#5a3550", "#7a
 const V2 = (r: number, y: number) => new THREE.Vector2(r, y);
 
 // ── 车削轮廓（绕 Y 回转） ───────────────────────────────────────────────────
-// 留声机喇叭（牵牛花）：长窄喉 → 临近口部急速指数外扩（凹形，才是"喇叭花"而非"漏斗/马提尼杯"）→ 卷边唇口。
-// 这是整个场景"建模感"最大的一笔。口径 0.47、深 0.635，比之前更深更夸张。
-const HORN_PROFILE = [
-  V2(0.028, 0), V2(0.034, 0.08), V2(0.044, 0.18), V2(0.06, 0.28),
-  V2(0.092, 0.37), V2(0.15, 0.45), V2(0.245, 0.52), V2(0.36, 0.57),
-  V2(0.45, 0.6), V2(0.47, 0.625), V2(0.44, 0.635),
-];
 // 灯杆：细的车削木/铜杆，带一两处节。
 const POST_PROFILE = [
   V2(0.085, 0), V2(0.05, 0.05), V2(0.044, 0.22), V2(0.058, 0.34),
@@ -374,90 +367,6 @@ function FloatingBooks() {
   );
 }
 
-function Gramophone() {
-  // 留声机：观星台上的影音声源（zones/RecordPlayer 叠加唱片与播放）。
-  // 喇叭重做成"牵牛花"：弯鹅颈从音箱升起 → 深而急扩的喇叭口 + 卷唇 + 口沿铜环；
-  // 喉部塞一盏暖光把喇叭内壁照成金的（不再是一团黑剪影）。
-  const neckCurve = useMemo(
-    () =>
-      new THREE.CatmullRomCurve3([
-        new THREE.Vector3(0, 0.55, -0.08),
-        new THREE.Vector3(0, 0.72, -0.18),
-        new THREE.Vector3(-0.02, 0.9, -0.06),
-        new THREE.Vector3(0, 1.0, 0.07),
-      ]),
-    [],
-  );
-  return (
-    <group position={GRAMOPHONE}>
-      {/* 柜体：底箱 + 内收的盖板 */}
-      <RoundedBox args={[0.72, 0.5, 0.6]} radius={0.03} smoothness={3} position={[0, 0.25, 0]} castShadow receiveShadow>
-        <meshStandardMaterial color={PALETTE.woodWarm} roughness={0.5} metalness={0.12} />
-      </RoundedBox>
-      <RoundedBox args={[0.66, 0.06, 0.54]} radius={0.02} smoothness={3} position={[0, 0.53, 0]} castShadow>
-        <meshStandardMaterial color={PALETTE.wood} roughness={0.45} metalness={0.15} />
-      </RoundedBox>
-      {/* 唱盘：毡垫 + 唱片 */}
-      <mesh position={[0, 0.57, 0.06]}>
-        <cylinderGeometry args={[0.23, 0.23, 0.012, 32]} />
-        <meshStandardMaterial color={"#2a1f1a"} roughness={1} />
-      </mesh>
-      <mesh position={[0, 0.578, 0.06]}>
-        <cylinderGeometry args={[0.21, 0.21, 0.01, 40]} />
-        <meshStandardMaterial color={"#0d0a08"} roughness={0.42} metalness={0.2} />
-      </mesh>
-      {/* 唱臂 */}
-      <group position={[0.22, 0.58, -0.1]} rotation={[0, -0.6, 0]}>
-        <mesh position={[0.0, 0.04, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
-          <cylinderGeometry args={[0.011, 0.011, 0.3, 10]} />
-          <meshStandardMaterial color={PALETTE.brass} roughness={0.3} metalness={1} />
-        </mesh>
-        <mesh position={[0, 0.02, 0]}>
-          <cylinderGeometry args={[0.028, 0.028, 0.05, 12]} />
-          <meshStandardMaterial color={PALETTE.brass} roughness={0.3} metalness={1} />
-        </mesh>
-      </group>
-      {/* 摇柄 */}
-      <group position={[0.4, 0.28, 0.0]}>
-        <mesh rotation={[0, 0, Math.PI / 2]}>
-          <cylinderGeometry args={[0.014, 0.014, 0.12, 10]} />
-          <meshStandardMaterial color={PALETTE.brass} roughness={0.32} metalness={1} />
-        </mesh>
-        <mesh position={[0.06, 0.05, 0]}>
-          <cylinderGeometry args={[0.012, 0.012, 0.1, 10]} />
-          <meshStandardMaterial color={PALETTE.brass} roughness={0.32} metalness={1} />
-        </mesh>
-      </group>
-      {/* 弯鹅颈（TubeGeometry 沿曲线，从唱臂根升到喇叭喉） */}
-      <mesh castShadow>
-        <tubeGeometry args={[neckCurve, 28, 0.036, 12, false]} />
-        <meshStandardMaterial color={PALETTE.brass} roughness={0.28} metalness={1} />
-      </mesh>
-      {/* ★ 喇叭花：朝上、略朝来客(+Z)；内壁被喉部暖光照亮 */}
-      <group position={[0, 1.0, 0.07]} rotation={[0.6, 0, 0]}>
-        <mesh castShadow>
-          <latheGeometry args={[HORN_PROFILE, 48]} />
-          <meshStandardMaterial
-            color={PALETTE.brass}
-            roughness={0.24}
-            metalness={1}
-            emissive={new THREE.Color(PALETTE.lampWarm)}
-            emissiveIntensity={0.1}
-            side={THREE.DoubleSide}
-          />
-        </mesh>
-        {/* 口沿卷边铜环 */}
-        <mesh position={[0, 0.625, 0]} rotation={[Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[0.455, 0.014, 12, 56]} />
-          <meshStandardMaterial color={PALETTE.brass} roughness={0.22} metalness={1} />
-        </mesh>
-      </group>
-      {/* 喉部暖光：把喇叭内壁照成金色，避免"黑洞" */}
-      <pointLight position={[0, 1.14, 0.18]} color={PALETTE.lampWarm} intensity={2.4} distance={1.7} decay={2} />
-    </group>
-  );
-}
-
 function ListeningNook() {
   // 观星台上、留声机旁的"听歌角"：毯子 + 靠垫 + 一盏暖台灯 —— 给登顶一个停留的理由。
   return (
@@ -546,7 +455,7 @@ export default function Gallery() {
       <Lectern />
       <PedestalBases />
       <FloatingBooks />
-      <Gramophone />
+      <GramophoneModel />
       <ListeningNook />
     </group>
   );

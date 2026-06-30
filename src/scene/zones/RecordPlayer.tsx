@@ -26,9 +26,11 @@ export default function RecordPlayer({ zone }: { zone: Zone }) {
     disc.current.rotation.y += dt * (playingTrackId ? 3.8 : 0.0);
   });
 
-  // 留声机顶台：Gallery 里 Gramophone 在 GRAMOPHONE 位置，顶台在 y=0.72（箱体 0.7+0.03/2）
-  const discY = 0.74; // 紧贴顶台面
-  const labelY = 0.755;
+  // 留声机唱盘：GLB 模型（GramophoneModel）箱体顶面在世界 y≈1.702、唱针臂在 ≈1.728。
+  // 旋转碟落在唱盘上（贴着模型自带唱片、压在唱针臂下方），让"正在放"的碟真的转。
+  // GRAMOPHONE 世界 y=1.45，故本地 discY = 1.71-1.45 ≈ 0.26。
+  const discY = 0.26; // 紧贴模型唱盘面
+  const labelY = 0.272;
 
   return (
     <group
@@ -36,15 +38,15 @@ export default function RecordPlayer({ zone }: { zone: Zone }) {
       position={GRAMOPHONE}
       onClick={(e) => { e.stopPropagation(); focusZone(zone.id); }}
     >
-      {/* 旋转黑胶唱片 */}
+      {/* 旋转黑胶唱片（盖住模型静态唱片，转起来就是"在放"）*/}
       <mesh ref={disc} position={[0, discY, 0]} castShadow>
-        <cylinderGeometry args={[0.25, 0.25, 0.022, 48]} />
-        <meshStandardMaterial color={"#0c0c0c"} roughness={0.28} metalness={0.22} />
+        <cylinderGeometry args={[0.18, 0.18, 0.016, 48]} />
+        <meshStandardMaterial color={"#0a0a0d"} roughness={0.3} metalness={0.24} />
       </mesh>
 
       {/* 唱片中心标签（播放时发暖光）*/}
       <mesh position={[0, labelY, 0]}>
-        <cylinderGeometry args={[0.065, 0.065, 0.008, 24]} />
+        <cylinderGeometry args={[0.05, 0.05, 0.008, 24]} />
         <meshStandardMaterial
           color={playingTrackId ? PALETTE.brass : "#6a5030"}
           emissive={new THREE.Color(playingTrackId ? PALETTE.glowAmber : "#000000")}
@@ -53,12 +55,12 @@ export default function RecordPlayer({ zone }: { zone: Zone }) {
         />
       </mesh>
 
-      {/* 播放时在唱片上方打一束暖光 */}
+      {/* 播放时在唱盘/喇叭口之间打一束暖光 */}
       <pointLight
-        position={[0, 0.85, 0]}
+        position={[0, 0.55, 0.05]}
         color={PALETTE.lampWarm}
-        intensity={playingTrackId ? 4.5 : 1.2}
-        distance={5}
+        intensity={playingTrackId ? 4.0 : 1.0}
+        distance={4}
         decay={2}
       />
 
