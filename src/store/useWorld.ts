@@ -17,6 +17,8 @@ interface WorldState {
   entered: boolean;
   enter: () => void;
   focusedZoneId: string | null;
+  /** 聚焦时相机要对准的世界坐标点（点中的物件本身）；为空则回退到功能区锚点。瞬态。 */
+  focusPoint: [number, number, number] | null;
   selectedEntryId: string | null;
   /** 准心当前对准的功能区（第一人称提示用），瞬态。 */
   hoveredZoneId: string | null;
@@ -28,7 +30,7 @@ interface WorldState {
   setPlaying: (id: string | null) => void;
 
   // —— 漫游 ——
-  focusZone: (id: string) => void;
+  focusZone: (id: string, point?: [number, number, number]) => void;
   clearFocus: () => void;
   selectEntry: (id: string | null) => void;
   /** 跳到某条内容所在的功能区并选中它（"最近添加"点击用）。 */
@@ -60,6 +62,7 @@ export const useWorld = create<WorldState>((set, get) => ({
   entries: [],
   entered: false,
   focusedZoneId: null,
+  focusPoint: null,
   selectedEntryId: null,
   hoveredZoneId: null,
   hoveredInReach: false,
@@ -70,8 +73,8 @@ export const useWorld = create<WorldState>((set, get) => ({
     set((s) => (s.hoveredZoneId === id && s.hoveredInReach === inReach ? s : { hoveredZoneId: id, hoveredInReach: inReach })),
   setPlaying: (id) => set({ playingTrackId: id }),
 
-  focusZone: (id) => set({ focusedZoneId: id, selectedEntryId: null }),
-  clearFocus: () => set({ focusedZoneId: null, selectedEntryId: null }),
+  focusZone: (id, point) => set({ focusedZoneId: id, focusPoint: point ?? null, selectedEntryId: null }),
+  clearFocus: () => set({ focusedZoneId: null, focusPoint: null, selectedEntryId: null }),
   selectEntry: (id) => set({ selectedEntryId: id }),
 
   gotoEntry: (id) => {

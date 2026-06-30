@@ -76,7 +76,7 @@ export default function ObjectMuseum({ zone }: { zone: Zone }) {
   });
 
   return (
-    <group ref={ref} onClick={(e) => { e.stopPropagation(); focusZone(zone.id); }}>
+    <group ref={ref} onClick={(e) => { e.stopPropagation(); focusZone(zone.id, [e.point.x, e.point.y, e.point.z]); }}>
       {items.map((it, i) => {
         const ped = PEDESTALS[i % PEDESTALS.length];
         return (

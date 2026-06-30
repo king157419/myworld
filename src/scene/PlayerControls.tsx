@@ -14,7 +14,7 @@ const TOUCH_SENS = 0.005;
 const PITCH_MAX = 1.18;
 const REACH = 7.0; // 可交互距离：近到这个范围内准心才亮、才能按 ENTER 进入
 const AIM_FAR = 24.0; // 准心命中检测距离：更远也先报出对准了什么（远处只提示名字）
-const EXIT_DUR = 0.55; // 退出聚焦时，从聚焦机位平滑飞回漫游位姿的时长（秒）
+const EXIT_DUR = 0.7; // 退出聚焦时，从聚焦机位平滑飞回漫游位姿的时长（秒）——略长，转场更明确
 const CENTER = new THREE.Vector2(0, 0);
 
 type AnchorId = keyof typeof ZONE_ANCHORS;
@@ -39,6 +39,7 @@ export default function PlayerControls() {
   const introFrom = useRef(new THREE.Vector3());
   const hoveredRef = useRef<string | null>(null);
   const reachRef = useRef(false);
+  const hitPointRef = useRef(new THREE.Vector3()); // 准心最近一次命中的世界坐标（聚焦时以它为中心）
   const snapshot = useRef<{ x: number; y: number; z: number; yaw: number; pitch: number } | null>(null);
   const exitActive = useRef(false);
   const exitT0 = useRef(0);
@@ -97,7 +98,10 @@ export default function PlayerControls() {
       }
       if (s.focusedZoneId) return;
       if (isLocked()) {
-        if (hoveredRef.current && reachRef.current) focusZone(hoveredRef.current); // 准心命中且够得着 → 聚焦
+        if (hoveredRef.current && reachRef.current) {
+          const p = hitPointRef.current;
+          focusZone(hoveredRef.current, [p.x, p.y, p.z]); // 命中且够得着 → 以命中点为中心聚焦
+        }
       } else {
         canvas.requestPointerLock?.();
       }
@@ -212,12 +216,13 @@ export default function PlayerControls() {
     if (s.focusedZoneId) {
       const a = ZONE_ANCHORS[s.focusedZoneId as AnchorId];
       const zone = s.world.zones.find((z) => z.id === s.focusedZoneId);
-      const cx = a ? a.position[0] : zone?.position[0] ?? 0;
-      const cy = a ? a.position[1] : zone?.position[1] ?? 1.4;
-      const cz = a ? a.position[2] : zone?.position[2] ?? 0;
+      const fp = s.focusPoint; // 点中的物件世界坐标——优先以它为中心
+      const cx = fp ? fp[0] : a ? a.position[0] : zone?.position[0] ?? 0;
+      const cy = fp ? fp[1] : a ? a.position[1] : zone?.position[1] ?? 1.4;
+      const cz = fp ? fp[2] : a ? a.position[2] : zone?.position[2] ?? 0;
       const ry = a ? a.ry : zone?.rotation?.[1] ?? 0;
       center.set(cx, cy, cz);
-      const dist = 2.85;
+      const dist = fp ? 2.25 : 2.85; // 对准具体物件时离近一点，框住它
       tmpTarget.set(cx + Math.sin(ry) * dist, cy + 0.28, cz + Math.cos(ry) * dist);
       camera.position.lerp(tmpTarget, 1 - Math.exp(-5 * dt));
       tmpObj.position.copy(camera.position);
@@ -300,6 +305,7 @@ export default function PlayerControls() {
       raycaster.setFromCamera(CENTER, camera);
       const hits = interactableObjs.length ? raycaster.intersectObjects(interactableObjs, true) : [];
       const id = hits.length ? zoneIdOf(hits[0].object) : null;
+      if (hits.length) hitPointRef.current.copy(hits[0].point);
       const inReach = hits.length > 0 && hits[0].distance <= REACH; // 近到可交互距离才算"够得着"
       if (id !== hoveredRef.current || inReach !== reachRef.current) {
         hoveredRef.current = id;
