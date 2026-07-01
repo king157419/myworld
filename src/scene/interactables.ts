@@ -3,13 +3,7 @@ import type * as THREE from "three";
 
 // 可交互物登记表：功能区把自己的可点击根对象登记进来，第一人称控制器用准心
 // 射线对这些对象做命中检测（指针锁定下 R3F 的指针事件坐标不可靠，故自做射线）。
-export interface Interactable {
-  obj: THREE.Object3D;
-  zoneId: string;
-}
-
-export const interactables: Interactable[] = [];
-// 与 interactables 同步维护的稳定对象数组：准心射线每帧直接用它，避免每帧 .map() 分配。
+// 稳定数组引用：准心射线每帧直接用它，避免每帧 .map() 分配。
 export const interactableObjs: THREE.Object3D[] = [];
 
 export function zoneIdOf(obj: THREE.Object3D | null): string | null {
@@ -29,11 +23,8 @@ export function useInteractable(zoneId: string) {
     const o = ref.current;
     if (!o) return;
     o.userData.zoneId = zoneId;
-    interactables.push({ obj: o, zoneId });
     interactableObjs.push(o);
     return () => {
-      const i = interactables.findIndex((x) => x.obj === o);
-      if (i >= 0) interactables.splice(i, 1);
       const j = interactableObjs.indexOf(o);
       if (j >= 0) interactableObjs.splice(j, 1);
     };

@@ -78,7 +78,7 @@ export default function Experience() {
         <Sky />
         <Lighting low={low} />
         <Gallery />
-        <Water low={low} />
+        <Water />
         <Atmosphere />
         <SunkenThoughts />
         <Zones />

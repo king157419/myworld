@@ -36,7 +36,7 @@ export default function RecordPlayer({ zone }: { zone: Zone }) {
     <group
       ref={ref}
       position={GRAMOPHONE}
-      onClick={(e) => { e.stopPropagation(); focusZone(zone.id, [e.point.x, e.point.y, e.point.z]); }}
+      onClick={(e) => { e.stopPropagation(); focusZone(zone.id); }}
     >
       {/* 旋转黑胶唱片（盖住模型静态唱片，转起来就是"在放"）*/}
       <mesh ref={disc} position={[0, discY, 0]} castShadow>

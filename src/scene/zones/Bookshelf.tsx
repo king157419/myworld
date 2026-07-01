@@ -87,7 +87,7 @@ export default function Bookshelf({ zone }: { zone: Zone }) {
   return (
     <>
       {/* 书墙主热区：覆盖整段圆弧 */}
-      <group ref={ref} onClick={(e) => { e.stopPropagation(); focusZone(zone.id, [e.point.x, e.point.y, e.point.z]); }}>
+      <group ref={ref} onClick={(e) => { e.stopPropagation(); focusZone(zone.id); }}>
         {/* 不可见的大碰撞盒，让准心在圆弧范围内都能命中 */}
         <mesh
           position={[anchor.position[0], anchor.position[1] - 0.55, anchor.position[2]]}
@@ -133,7 +133,7 @@ export default function Bookshelf({ zone }: { zone: Zone }) {
       <group
         ref={lecternRef}
         position={LECTERN}
-        onClick={(e) => { e.stopPropagation(); focusZone(zone.id, [e.point.x, e.point.y, e.point.z]); }}
+        onClick={(e) => { e.stopPropagation(); focusZone(zone.id); }}
       >
         <mesh visible={false} position={[0, 0.6, 0]}>
           <boxGeometry args={[0.9, 1.2, 0.9]} />

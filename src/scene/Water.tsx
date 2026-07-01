@@ -101,8 +101,7 @@ function RippleOverlay() {
   );
 }
 
-export default function Water({ low = false }: { low?: boolean }) {
-  void low;
+export default function Water() {
   const group = useRef<THREE.Group>(null);
   useFrame((s) => {
     if (group.current) group.current.position.y = tideOffset(s.clock.elapsedTime);

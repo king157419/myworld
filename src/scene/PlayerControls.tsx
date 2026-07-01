@@ -38,7 +38,6 @@ export default function PlayerControls() {
   const introFrom = useRef(new THREE.Vector3());
   const hoveredRef = useRef<string | null>(null);
   const reachRef = useRef(false);
-  const hitPointRef = useRef(new THREE.Vector3()); // 准心最近一次命中的世界坐标（聚焦时以它为中心）
   const snapshot = useRef<{ x: number; y: number; z: number; yaw: number; pitch: number } | null>(null);
   const exitActive = useRef(false);
   const exitAccum = useRef(0); // 退出缓动累计时长（超时兜底交还控制）
@@ -98,8 +97,7 @@ export default function PlayerControls() {
       if (s.focusedZoneId) return;
       if (isLocked()) {
         if (hoveredRef.current && reachRef.current) {
-          const p = hitPointRef.current;
-          focusZone(hoveredRef.current, [p.x, p.y, p.z]); // 命中且够得着 → 以命中点为中心聚焦
+          focusZone(hoveredRef.current); // 命中且够得着 → 聚焦（取景中心由 theme.FOCUS 包围球决定）
         }
       } else {
         canvas.requestPointerLock?.();
@@ -323,7 +321,6 @@ export default function PlayerControls() {
       raycaster.setFromCamera(CENTER, camera);
       const hits = interactableObjs.length ? raycaster.intersectObjects(interactableObjs, true) : [];
       const id = hits.length ? zoneIdOf(hits[0].object) : null;
-      if (hits.length) hitPointRef.current.copy(hits[0].point);
       const inReach = hits.length > 0 && hits[0].distance <= REACH; // 近到可交互距离才算"够得着"
       if (id !== hoveredRef.current || inReach !== reachRef.current) {
         hoveredRef.current = id;
