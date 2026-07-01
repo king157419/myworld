@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import * as THREE from "three";
 import { Environment, Lightformer } from "@react-three/drei";
-import { DECK_Y, PALETTE } from "../theme";
+import { DECK_Y, GRAMOPHONE, PALETTE } from "../theme";
 
 // 夜的光：冷的月作主光（唯一投影），暖的灯由 Gallery 的 pointLight / 自发光球承担。
 // 背景交给 Sky 的星空穹顶（不设纯色背景）；近水雾由 Atmosphere 处理。
@@ -30,8 +30,8 @@ export default function Lighting({ low = false }: { low?: boolean }) {
         shadow-bias={-0.0004}
         shadow-normalBias={0.02}
       />
-      {/* 观星台暖色补光：给台子和留声机一点存在感与停留的暖意（替换原来悬空的中央补光，那会在水里糊成无源白斑） */}
-      <pointLight position={[0, DECK_Y + 1.3, -9.2]} color={PALETTE.lampWarm} intensity={4.5} distance={9} decay={2} />
+      {/* 观星台暖色补光：给台子和留声机一点存在感与停留的暖意（锚在 GRAMOPHONE 邻域，挪留声机时跟着走） */}
+      <pointLight position={[GRAMOPHONE[0], DECK_Y + 1.3, GRAMOPHONE[2] + 0.2]} color={PALETTE.lampWarm} intensity={4.5} distance={9} decay={2} />
       {/* 广场低位暖溢光：贴着水面抬一点暗部，但不投影、范围克制 */}
       <pointLight position={[0, 0.8, 1.5]} color={"#ffca82"} intensity={1.6} distance={9} decay={2} />
       {/* 更厚的 IBL：黄铜/金属现在能反射到"暖灯池 + 冷天 + 暖地"，不再是死黑；

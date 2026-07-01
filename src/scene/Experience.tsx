@@ -5,7 +5,7 @@ import * as THREE from "three";
 import Lighting from "./Lighting";
 import Sky from "./Sky";
 import Water from "./Water";
-import Gallery from "./Gallery";
+import Gallery from "./gallery";
 import Atmosphere from "./Atmosphere";
 import Zones from "./zones/Zones";
 import SunkenThoughts from "./SunkenThoughts";

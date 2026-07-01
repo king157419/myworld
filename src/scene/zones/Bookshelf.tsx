@@ -6,6 +6,7 @@ import { BOOKWALL, LECTERN, PALETTE, ZONE_ANCHORS, tideOffset } from "../../them
 import { useWorld } from "../../store/useWorld";
 import { useZoneEntries } from "../../ui/useZoneEntries";
 import { useInteractable } from "../interactables";
+import { seededRng } from "../rng";
 
 // 书墙 · 思考：-X 圆弧书墙 + 写作台热区。
 // 用户"思考"越多，书脊的暖光越密越亮。
@@ -15,11 +16,6 @@ const SPINE_COLORS = [
   "#6b2b22", "#2f4a5a", "#4a3a22", "#3a4a2e", "#5a3a4a",
   "#2a3550", "#7a5a2a", "#43302a", "#8a6a3a", "#4a5a6a",
 ] as const;
-
-function seededRng(seed: number) {
-  let s = seed;
-  return () => ((s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
-}
 
 // 沿圆弧书墙排一排发光书脊（instanced），位置在书架面内侧（朝圆心）。
 function useGlowSpines(count: number) {
