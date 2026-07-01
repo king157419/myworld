@@ -5,25 +5,25 @@ import type { Mesh } from "three";
 import type { Zone } from "../../config/types";
 import { DECK_Y, GRAMOPHONE, PALETTE } from "../../theme";
 import { useWorld } from "../../store/useWorld";
+import { useAudio } from "../../audio/useAudio";
 import { useInteractable } from "../interactables";
 
 // 留声机 · 影音：观星台上的 GRAMOPHONE 热区 + 旋转黑胶碟。
 // Gallery 已渲染留声机箱体和喇叭；这里只叠加：
 //   - 旋转的黑胶唱片（播放时飞转，反之停止）
 //   - 准心可点击的根 group
-// 音轨列表在 ui/RecordPanel 里；playingTrackId 驱动转速。
+// 音轨列表在 ui/RecordPanel 里；useAudio.musicPlaying（曲库真实播放态）驱动转速与辉光。
 
 export default function RecordPlayer({ zone }: { zone: Zone }) {
   const disc = useRef<Mesh>(null);
   const focusZone = useWorld((s) => s.focusZone);
-  // playingTrackId 非 null 即为"有音轨正在播放"
-  const playingTrackId = useWorld((s) => s.playingTrackId);
+  const playing = useAudio((s) => s.musicPlaying);
   const ref = useInteractable(zone.id);
 
   useFrame((_, dt) => {
     if (!disc.current) return;
-    // 有选中音轨时飞转，否则静止
-    disc.current.rotation.y += dt * (playingTrackId ? 3.8 : 0.0);
+    // 播放中飞转，暂停静止
+    disc.current.rotation.y += dt * (playing ? 3.8 : 0.0);
   });
 
   // 留声机唱盘：GLB 模型（GramophoneModel）箱体顶面在世界 y≈1.702、唱针臂在 ≈1.728。
@@ -48,9 +48,9 @@ export default function RecordPlayer({ zone }: { zone: Zone }) {
       <mesh position={[0, labelY, 0]}>
         <cylinderGeometry args={[0.05, 0.05, 0.008, 24]} />
         <meshStandardMaterial
-          color={playingTrackId ? PALETTE.brass : "#6a5030"}
-          emissive={new THREE.Color(playingTrackId ? PALETTE.glowAmber : "#000000")}
-          emissiveIntensity={playingTrackId ? 0.9 : 0}
+          color={playing ? PALETTE.brass : "#6a5030"}
+          emissive={new THREE.Color(playing ? PALETTE.glowAmber : "#000000")}
+          emissiveIntensity={playing ? 0.9 : 0}
           roughness={0.5}
         />
       </mesh>
@@ -59,7 +59,7 @@ export default function RecordPlayer({ zone }: { zone: Zone }) {
       <pointLight
         position={[0, 0.55, 0.05]}
         color={PALETTE.lampWarm}
-        intensity={playingTrackId ? 4.0 : 1.0}
+        intensity={playing ? 4.0 : 1.0}
         distance={4}
         decay={2}
       />

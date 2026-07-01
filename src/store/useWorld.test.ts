@@ -12,7 +12,6 @@ const reset = () =>
     entries: [],
     focusedZoneId: null,
     selectedEntryId: null,
-    playingTrackId: null,
   });
 
 describe("store: 内容 CRUD 与时间戳（生长的基础）", () => {

@@ -23,9 +23,6 @@ interface WorldState {
   /** 对准的功能区是否已进入可交互距离（远处只提示名字、近了才能按 ENTER）。瞬态。 */
   hoveredInReach: boolean;
   setHovered: (id: string | null, inReach: boolean) => void;
-  /** 当前正在播放的音轨 id（驱动唱片机转动），瞬态、不落盘。 */
-  playingTrackId: string | null;
-  setPlaying: (id: string | null) => void;
 
   // —— 漫游 ——
   focusZone: (id: string) => void;
@@ -63,12 +60,10 @@ export const useWorld = create<WorldState>((set, get) => ({
   selectedEntryId: null,
   hoveredZoneId: null,
   hoveredInReach: false,
-  playingTrackId: null,
 
   enter: () => set({ entered: true }),
   setHovered: (id, inReach) =>
     set((s) => (s.hoveredZoneId === id && s.hoveredInReach === inReach ? s : { hoveredZoneId: id, hoveredInReach: inReach })),
-  setPlaying: (id) => set({ playingTrackId: id }),
 
   focusZone: (id) => set({ focusedZoneId: id, selectedEntryId: null }),
   clearFocus: () => set({ focusedZoneId: null, selectedEntryId: null }),
@@ -103,8 +98,6 @@ export const useWorld = create<WorldState>((set, get) => ({
     set((s) => ({
       entries: s.entries.filter((x) => x.id !== id),
       selectedEntryId: s.selectedEntryId === id ? null : s.selectedEntryId,
-      // 删除正在播放的音轨时一并清理播放状态（音频元素的暂停在组件层处理）。
-      playingTrackId: s.playingTrackId === id ? null : s.playingTrackId,
       world: touchWorld(s.world, Date.now()),
     }));
     persist(get);
