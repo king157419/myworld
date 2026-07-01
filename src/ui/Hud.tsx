@@ -32,6 +32,7 @@ export default function Hud() {
   const startAudio     = useAudio((s) => s.start);
   const musicPlaying   = useAudio((s) => s.musicPlaying);
   const toggleMusic    = useAudio((s) => s.toggleMusic);
+  const nextTrack      = useAudio((s) => s.nextTrack);
   const muted          = useAudio((s) => s.muted);
   const toggleMute     = useAudio((s) => s.toggleMute);
 
@@ -141,6 +142,7 @@ export default function Hud() {
           >
             {musicPlaying ? "暂停" : "播放黑胶"}
           </button>
+          <button className="ctl" onClick={nextTrack} title="下一首">下一首</button>
 
           <span className="ctl-divider" aria-hidden />
 

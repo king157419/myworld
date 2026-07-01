@@ -992,6 +992,28 @@ button.icon:hover { color: var(--ink); }
 .np-btn {
   white-space: nowrap;
 }
+.np-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.np-skip {
+  font-family: var(--mech);
+  font-size: 0.9rem;
+  line-height: 1;
+  color: var(--ink-3);
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 5px 7px;
+  cursor: pointer;
+  transition: color var(--t-quick) var(--ease), border-color var(--t-quick) var(--ease);
+}
+.np-skip:hover {
+  color: var(--amber-ink);
+  border-color: var(--amber);
+}
 
 /* ══════════════════════════════════════════════
    3D 内悬浮标签（zone-label，R3F Html 组件）

@@ -2,7 +2,7 @@
 // 灵境声场：真实音频文件版（CC0 / CC-BY / PD，离线打包进仓库）。
 //
 //   · 环境水声（water-ambient.ogg，全局，轻增益，循环）
-//   · 钢琴夜曲（music-nocturne.mp3，CC0，空间化在 GRAMOPHONE 位 → 走近变响）
+//   · 留声机曲库（多首 PD/CC0 夜曲，空间化在 GRAMOPHONE 位 → 走近变响；放完自动接下一首，可切换）
 //   · 远雷（由天气层在闪电后触发，用合成噪声，轻量）
 //
 // 首个用户手势后 start()；fetch + decodeAudioData 懒加载。
@@ -14,6 +14,21 @@
 const GRAMOPHONE_POS: [number, number, number] = [0, 1.45, -9.4];
 
 type Vec = [number, number, number];
+
+// 留声机曲库（全部 PD / CC0，离线打包进 public/audio；署名见 public/audio/CREDITS.md）。
+// 一首放完自动接下一首（成一套"夜的曲目单"），也可在面板里点选/切换。
+export interface TrackMeta {
+  id: string;
+  title: string;
+  sub: string;
+  file: string;
+}
+export const TRACKS: TrackMeta[] = [
+  { id: "nocturne-op9-2", title: "夜曲 · 作品9之2", sub: "肖邦 · Frank Levy（PD）", file: "music-nocturne.mp3" },
+  { id: "nocturne-op9-1", title: "夜曲 · 作品9之1", sub: "肖邦 · V. Chaimovich（CC0）", file: "music-nocturne-op9no1.ogg" },
+  { id: "nocturne-cminor", title: "升c小调夜曲 · 遗作", sub: "肖邦 · Aaron Dunn（CC0）", file: "music-nocturne-cminor.ogg" },
+  { id: "gymnopedie-1", title: "Gymnopédie No.1", sub: "萨蒂 · R. Alciatore（PD）", file: "music-gymnopedie1.ogg" },
+];
 
 /** 用 BASE_URL 拼接 public/ 下的相对路径，兼容开发服务器与生产构建。 */
 function audioUrl(filename: string): string {
@@ -73,10 +88,13 @@ export class AudioEngine {
   private ctx: AudioContext | null = null;
   private master!: GainNode;
 
-  // —— 音乐总线（留声机空间化）——
+  // —— 音乐总线（留声机空间化）+ 曲库 ——
   private musicBus!: GainNode;
   private musicPanner!: PannerNode;
   private musicSource: AudioBufferSourceNode | null = null;
+  private trackBufs: (AudioBuffer | null)[] = [];
+  private currentIndex = 0;
+  private onTrackChange?: (i: number) => void;
 
   // —— 环境水声总线（全局）——
   private waterSource: AudioBufferSourceNode | null = null;
@@ -137,30 +155,28 @@ export class AudioEngine {
     void this.loadAndPlay(ctx);
   }
 
-  /** 加载两个音频文件并启动循环播放。 */
+  /** 加载环境水声 + 整套曲库并启动播放（首曲）。 */
   private async loadAndPlay(ctx: AudioContext): Promise<void> {
     // 噪声缓冲（雷声用，轻量，立即生成）
     this.noiseBuf = makeNoiseBuf(ctx, 3);
 
-    // 并行拉取两个文件
-    const [waterBuf, musicBuf] = await Promise.all([
+    // 并行拉取：水声 + 全部曲目
+    const [waterBuf, ...trackBufs] = await Promise.all([
       loadBuffer(ctx, audioUrl("water-ambient.ogg")),
-      loadBuffer(ctx, audioUrl("music-nocturne.mp3")),
+      ...TRACKS.map((t) => loadBuffer(ctx, audioUrl(t.file))),
     ]);
+    this.trackBufs = trackBufs;
 
     // —— 环境水声（循环，全局）——
     if (waterBuf) {
       this.startWaterLoop(ctx, waterBuf);
     }
 
-    // —— 钢琴夜曲（循环，音乐总线）——
-    if (musicBuf) {
-      this.startMusicLoop(ctx, musicBuf);
-      // 如果 start() 之后 setMusicPlaying(true) 已经被调用，淡入增益
-      if (this.musicOn) {
-        this.musicBus.gain.cancelScheduledValues(ctx.currentTime);
-        this.musicBus.gain.setTargetAtTime(1, ctx.currentTime, 0.4);
-      }
+    // —— 曲库：从当前曲目起播（放完自动接下一首）——
+    this.playCurrent();
+    if (this.musicOn) {
+      this.musicBus.gain.cancelScheduledValues(ctx.currentTime);
+      this.musicBus.gain.setTargetAtTime(1, ctx.currentTime, 0.4);
     }
   }
 
@@ -173,14 +189,39 @@ export class AudioEngine {
     this.waterSource = src;
   }
 
-  private startMusicLoop(ctx: AudioContext, buf: AudioBuffer) {
-    const src = ctx.createBufferSource();
+  /** 起播当前曲目：停掉旧源、从缓冲新建源，放完自动接下一首。 */
+  private playCurrent() {
+    if (!this.ctx) return;
+    if (this.musicSource) {
+      this.musicSource.onended = null; // 主动切换：别让 onended 误触发自动下一首
+      try { this.musicSource.stop(); } catch { /* 已停止 */ }
+      this.musicSource = null;
+    }
+    const buf = this.trackBufs[this.currentIndex];
+    if (!buf) { this.onTrackChange?.(this.currentIndex); return; } // 尚未加载完
+    const src = this.ctx.createBufferSource();
     src.buffer = buf;
-    src.loop = true;
+    src.loop = false;
     src.connect(this.musicBus);
+    src.onended = () => { if (this.musicSource === src) this.next(); }; // 自然播完 → 下一首
     src.start();
     this.musicSource = src;
+    this.onTrackChange?.(this.currentIndex);
   }
+
+  // ── 曲库控制 ──────────────────────────────────────────────────────────
+  get trackList(): TrackMeta[] { return TRACKS; }
+  get currentTrack(): number { return this.currentIndex; }
+  setOnTrackChange(cb: (i: number) => void): void { this.onTrackChange = cb; }
+
+  /** 点选某曲目播放（i 越界忽略）。 */
+  playTrack(i: number): void {
+    if (i < 0 || i >= TRACKS.length) return;
+    this.currentIndex = i;
+    this.playCurrent();
+  }
+  next(): void { this.playTrack((this.currentIndex + 1) % TRACKS.length); }
+  prev(): void { this.playTrack((this.currentIndex - 1 + TRACKS.length) % TRACKS.length); }
 
   // ── 远雷（天气层在闪电后延迟调用） ────────────────────────────────────
 
