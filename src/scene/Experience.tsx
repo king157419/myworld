@@ -12,6 +12,7 @@ import SunkenThoughts from "./SunkenThoughts";
 import PlayerControls from "./PlayerControls";
 import PostFX from "./PostFX";
 import { useWorld } from "../store/useWorld";
+import { useAudio } from "../audio/useAudio";
 
 // 仅开发期：把 renderer/scene/camera/store 暴露到 window，便于无头/隐藏页验证。
 // 副作用放进 useEffect（render 纯净），db 桥只引入一次。
@@ -22,9 +23,10 @@ function DevBridge() {
   const advance = useThree((s) => s.advance);
   const invalidate = useThree((s) => s.invalidate);
   useEffect(() => {
-    const w = window as unknown as { __lj?: unknown; __ljStore?: unknown; __THREE?: unknown; __ljDb?: unknown };
+    const w = window as unknown as { __lj?: unknown; __ljStore?: unknown; __ljAudio?: unknown; __THREE?: unknown; __ljDb?: unknown };
     w.__lj = { gl, scene, camera, advance, invalidate };
     w.__ljStore = useWorld;
+    w.__ljAudio = useAudio;
     w.__THREE = THREE;
     void import("../data/db").then((db) => {
       w.__ljDb = db;
