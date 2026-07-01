@@ -88,6 +88,15 @@ export const ZONE_ANCHORS = {
   "zone-record": { position: [0, DECK_Y + 0.95, -9.0] as Vec3, ry: 0 }, // 观星台留声机，朝 +Z 望向镜面
 } as const;
 
+// 聚焦取景：每个功能区的「主体」包围球（中心 + 半径）。PlayerControls 据此用 fov 反算
+// 取景距离恰好框住主体，并从玩家当前所在的一侧切入（least-disorienting）——不再以"点击命中
+// 点"为中心（命中点落在不可见碰撞盒上、随机飘忽，是之前聚焦像在乱看的根因）。
+export const FOCUS: Record<string, { center: Vec3; radius: number }> = {
+  "zone-record": { center: [0, 2.02, -9.4], radius: 1.05 }, // 留声机本体（含喇叭）
+  "zone-bookshelf": { center: [-6.0, 1.95, -0.3], radius: 2.5 }, // -X 书墙一段
+  "zone-objects": { center: [5.2, 1.05, 0.0], radius: 2.3 }, // +X 浮岛群
+};
+
 // 书墙（思考）：沿 -X 一段圆弧排布的高书架。角度区间（绕 Y，0=+X 方向，逆时针）。
 export const BOOKWALL = {
   radius: R_RING,

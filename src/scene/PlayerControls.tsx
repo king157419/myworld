@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { useWorld } from "../store/useWorld";
@@ -6,7 +6,7 @@ import { audioEngine } from "../audio/engine";
 import { resolveMove } from "./walk";
 import { interactableObjs, zoneIdOf } from "./interactables";
 import { spawnRipple } from "./ripples";
-import { EYE, SPAWN, ZONE_ANCHORS } from "../theme";
+import { EYE, FOCUS, SPAWN, ZONE_ANCHORS } from "../theme";
 
 const SPEED = 4.3; // 漫游步速（之前 3.0 偏慢）
 const SENS = 0.0022;
@@ -14,7 +14,6 @@ const TOUCH_SENS = 0.005;
 const PITCH_MAX = 1.18;
 const REACH = 7.0; // 可交互距离：近到这个范围内准心才亮、才能按 ENTER 进入
 const AIM_FAR = 24.0; // 准心命中检测距离：更远也先报出对准了什么（远处只提示名字）
-const EXIT_DUR = 0.7; // 退出聚焦时，从聚焦机位平滑飞回漫游位姿的时长（秒）——略长，转场更明确
 const CENTER = new THREE.Vector2(0, 0);
 
 type AnchorId = keyof typeof ZONE_ANCHORS;
@@ -42,17 +41,17 @@ export default function PlayerControls() {
   const hitPointRef = useRef(new THREE.Vector3()); // 准心最近一次命中的世界坐标（聚焦时以它为中心）
   const snapshot = useRef<{ x: number; y: number; z: number; yaw: number; pitch: number } | null>(null);
   const exitActive = useRef(false);
-  const exitT0 = useRef(0);
+  const exitAccum = useRef(0); // 退出缓动累计时长（超时兜底交还控制）
+  const prevFocused = useRef<string | null>(null); // 帧内检测聚焦进/出（消除 effect 竞态）
   const touchPts = useRef(new Map<number, { kind: "move" | "look"; sx: number; sy: number; lx: number; ly: number }>());
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const tmpDir = useMemo(() => new THREE.Vector3(), []);
   const tmpUp = useMemo(() => new THREE.Vector3(), []);
-  const tmpObj = useMemo(() => new THREE.Object3D(), []);
-  const tmpTarget = useMemo(() => new THREE.Vector3(), []);
+  const tmpMat = useMemo(() => new THREE.Matrix4(), []);
   const center = useMemo(() => new THREE.Vector3(), []);
-  const exitFrom = useMemo(() => new THREE.Vector3(), []);
-  const exitFromQ = useMemo(() => new THREE.Quaternion(), []);
+  const focusGoal = useMemo(() => new THREE.Vector3(), []);
+  const focusGoalQ = useMemo(() => new THREE.Quaternion(), []);
   const tmpPos = useMemo(() => new THREE.Vector3(), []);
   const tmpQ = useMemo(() => new THREE.Quaternion(), []);
   const tmpEuler = useMemo(() => new THREE.Euler(0, 0, 0, "YXZ"), []);
@@ -143,27 +142,57 @@ export default function PlayerControls() {
     };
   }, [gl, camera, focusZone, clearFocus]);
 
-  // 聚焦进出：进入时快照漫游位姿并解锁指针；退出时不再瞬切——从当前聚焦机位平滑飞回漫游位姿。
-  const focusedZoneId = useWorld((s) => s.focusedZoneId);
-  useEffect(() => {
-    if (focusedZoneId) {
-      snapshot.current = { x: feet.current.x, y: feet.current.y, z: feet.current.z, yaw: yaw.current, pitch: pitch.current };
-      document.exitPointerLock?.();
-      exitActive.current = false; // 进入时取消任何未完成的回程过渡
-    } else if (snapshot.current) {
-      // 退出：记下当前（聚焦）机位作为过渡起点，开始回程缓动。snapshot 保留到过渡结束才写回。
-      exitFrom.copy(camera.position);
-      exitFromQ.copy(camera.quaternion);
-      exitT0.current = clock.elapsedTime;
-      exitActive.current = true;
-    }
-  }, [focusedZoneId, camera, clock, exitFrom, exitFromQ]);
+  // 聚焦进/出由帧循环检测调用（不放 effect——effect 晚一帧会让漫游分支先把相机跳回脚步位，
+  // 那正是"退出没有动画 / 直接跳转"的根因）。这里只算好目标位姿/快照，实际缓动在帧里用指数阻尼。
+  const beginFocus = useCallback((id: string) => {
+    snapshot.current = { x: feet.current.x, y: feet.current.y, z: feet.current.z, yaw: yaw.current, pitch: pitch.current };
+    document.exitPointerLock?.();
+
+    // 目标机位：以"功能区主体包围球"为中心，按 fov 反算取景距离恰好框住它，从玩家当前所在的一侧
+    // 切入（least-disorienting）。朝向用 Matrix4.lookAt（相机约定：-Z 指向目标），**不**用
+    // Object3D.lookAt（那对非相机物体会把朝向反向 → 之前相机背对所点物件，看着"莫名其妙"）。
+    const f = FOCUS[id];
+    const a = ZONE_ANCHORS[id as AnchorId];
+    const cx = f ? f.center[0] : a ? a.position[0] : 0;
+    const cy = f ? f.center[1] : a ? a.position[1] : 1.4;
+    const cz = f ? f.center[2] : a ? a.position[2] : 0;
+    const radius = f ? f.radius : 1.6;
+    center.set(cx, cy, cz);
+
+    const cam = camera as THREE.PerspectiveCamera;
+    const vFov = THREE.MathUtils.degToRad(cam.fov ?? 55);
+    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * (cam.aspect ?? 1.6));
+    const dist = Math.max(radius / Math.sin(vFov / 2), radius / Math.sin(hFov / 2)) * 1.3;
+
+    tmpDir.copy(camera.position).sub(center);
+    if (tmpDir.lengthSq() < 1e-4) tmpDir.set(0, 0.15, 1);
+    tmpDir.normalize();
+    tmpDir.y = THREE.MathUtils.clamp(tmpDir.y, -0.15, 0.55);
+    tmpDir.normalize();
+    focusGoal.copy(center).addScaledVector(tmpDir, dist);
+    tmpMat.lookAt(focusGoal, center, tmpUp.set(0, 1, 0));
+    focusGoalQ.setFromRotationMatrix(tmpMat);
+    exitActive.current = false;
+  }, [camera, center, tmpMat, tmpDir, tmpUp, focusGoal, focusGoalQ]);
+
+  const beginExit = useCallback(() => {
+    if (!snapshot.current) return;
+    exitAccum.current = 0;
+    exitActive.current = true;
+  }, []);
 
   useFrame((_state, dtRaw) => {
     // 仅开发期：__freecam 置位时不写相机（供无头验证从任意机位渲染并经后处理）。
     if (import.meta.env.DEV && (window as unknown as { __freecam?: boolean }).__freecam) return;
     const dt = Math.min(dtRaw, 0.05);
     const s = useWorld.getState();
+
+    // ── 聚焦进/出转场：帧内检测（在漫游分支之前），消除 effect 晚一帧导致的"直接跳转" ──
+    if (s.focusedZoneId !== prevFocused.current) {
+      if (s.focusedZoneId) beginFocus(s.focusedZoneId);
+      else beginExit();
+      prevFocused.current = s.focusedZoneId;
+    }
 
     // ── 入场前：缓慢电影感环绕 ──
     if (!s.entered) {
@@ -212,38 +241,25 @@ export default function PlayerControls() {
       pitch.current = -0.04;
     }
 
-    // ── 聚焦某功能区：平滑飞入并环视 ──
+    // ── 聚焦某功能区：指数阻尼缓动飞入并定格（无定时器、按 dt 收敛 → 不受隐藏页/掉帧节流影响，
+    //    始终顺滑；目标 focusGoal/focusGoalQ 由 beginFocus 一次算好，相机约定朝向已对准物件）──
     if (s.focusedZoneId) {
-      const a = ZONE_ANCHORS[s.focusedZoneId as AnchorId];
-      const zone = s.world.zones.find((z) => z.id === s.focusedZoneId);
-      const fp = s.focusPoint; // 点中的物件世界坐标——优先以它为中心
-      const cx = fp ? fp[0] : a ? a.position[0] : zone?.position[0] ?? 0;
-      const cy = fp ? fp[1] : a ? a.position[1] : zone?.position[1] ?? 1.4;
-      const cz = fp ? fp[2] : a ? a.position[2] : zone?.position[2] ?? 0;
-      const ry = a ? a.ry : zone?.rotation?.[1] ?? 0;
-      center.set(cx, cy, cz);
-      const dist = fp ? 2.25 : 2.85; // 对准具体物件时离近一点，框住它
-      tmpTarget.set(cx + Math.sin(ry) * dist, cy + 0.28, cz + Math.cos(ry) * dist);
-      camera.position.lerp(tmpTarget, 1 - Math.exp(-5 * dt));
-      tmpObj.position.copy(camera.position);
-      tmpObj.lookAt(center);
-      camera.quaternion.slerp(tmpObj.quaternion, 1 - Math.exp(-6 * dt));
+      camera.position.lerp(focusGoal, 1 - Math.exp(-6 * dt));
+      camera.quaternion.slerp(focusGoalQ, 1 - Math.exp(-9 * dt));
       syncListener();
       return;
     }
 
-    // ── 退出聚焦的回程过渡：从聚焦机位平滑飞回漫游位姿，到位再交还控制（消除"直接跳转"）──
+    // ── 退出聚焦：指数阻尼飞回漫游位姿，到位（或超时兜底）再交还控制（消除"直接跳转"）──
     if (exitActive.current && snapshot.current) {
-      const e = clock.elapsedTime - exitT0.current;
-      const x = Math.min(1, e / EXIT_DUR);
-      const kk = x * x * x * (x * (x * 6 - 15) + 10); // smootherstep
       tmpPos.set(snapshot.current.x, snapshot.current.y + EYE, snapshot.current.z);
       tmpEuler.set(snapshot.current.pitch, snapshot.current.yaw, 0);
       tmpQ.setFromEuler(tmpEuler);
-      camera.position.lerpVectors(exitFrom, tmpPos, kk);
-      camera.quaternion.slerpQuaternions(exitFromQ, tmpQ, kk);
+      camera.position.lerp(tmpPos, 1 - Math.exp(-6 * dt));
+      camera.quaternion.slerp(tmpQ, 1 - Math.exp(-9 * dt));
       syncListener();
-      if (x >= 1) {
+      exitAccum.current += dt;
+      if (camera.position.distanceTo(tmpPos) < 0.03 || exitAccum.current > 1.4) {
         feet.current.set(snapshot.current.x, snapshot.current.y, snapshot.current.z);
         yaw.current = snapshot.current.yaw;
         pitch.current = snapshot.current.pitch;
