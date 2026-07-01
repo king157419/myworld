@@ -5,13 +5,21 @@
 // 「潮汐图书馆」可行走区是三块的并集：
 //   ① 镜面广场：半径 R_COURT 的水盘（y=0，你"走在水上"）。
 //   ② 观星台：后方 -Z 抬高的平台（y=DECK_Y）。
-//   ③ 木梯：连通广场与观星台（逐级抬升）。
-// 支撑高度按当前 y 在同一 xz 上区分"站在水面"还是"站在观星台"。
+//   ③ 登台坡道：连通广场与观星台。**高度是 z 的连续函数（线性坡）**，不是离散台阶。
+//
+// 关键修复（本轮）：
+//   · 离散台阶 → 连续坡道。支撑高度按 z 单调，**绝不会**一帧跳过好几级（之前的"瞬移上去"）。
+//   · clamp 改为"最近可行走区"（不再在走出台子边缘时径向投影回水圈 → 那是"空气墙向后瞬移"的根因）。
+//   · 加 MAX_STEP_UP 门限：从侧面撞上比脚高很多的坡壁会被挡住（像墙），不再"瞬移上去"。
 // ─────────────────────────────────────────────────────────────────────────
-import { DECK, DECK_Y, LECTERN, PEDESTALS, R_COURT, STEPS, STEP_RISE, STEP_RUN } from "../theme";
+import { DECK, DECK_Y, LECTERN, PEDESTALS, R_COURT, STEPS } from "../theme";
 
-const STEP_TOL = STEP_RISE + 0.14;
 const RADIUS = 0.32; // 玩家身体半径
+const MAX_STEP_UP = 0.42; // 单帧最多抬升（> 一级踏步，≪ 多级；> 走坡每帧抬升，故正常上坡不受阻）
+
+function clamp(v: number, lo: number, hi: number) {
+  return v < lo ? lo : v > hi ? hi : v;
+}
 
 function inCourt(x: number, z: number): boolean {
   return Math.hypot(x, z) <= R_COURT + 1e-3;
@@ -22,23 +30,25 @@ function inDeck(x: number, z: number): boolean {
 function inSteps(x: number, z: number): boolean {
   return x >= STEPS.x0 && x <= STEPS.x1 && z >= STEPS.zTop && z <= STEPS.zBottom;
 }
-/** 木梯在某 z 处的踏面高度（zBottom 处最低，zTop 处接近 DECK_Y）。 */
-function stepHeightAt(z: number): number {
-  const i = Math.min(STEPS.count - 1, Math.max(0, Math.floor((STEPS.zBottom - z) / STEP_RUN)));
-  return (i + 1) * STEP_RISE;
+
+/**
+ * 登台坡道在某 z 处的高度。zBottom(水面,-6.5)=0 → zTop(台前缘,-8.1)=DECK_Y，线性、单调。
+ * 单调是"不瞬移"的根本保证：z 每帧只动一点点，高度也只动一点点。
+ */
+export function rampHeightAt(z: number): number {
+  const t = clamp((STEPS.zBottom - z) / (STEPS.zBottom - STEPS.zTop), 0, 1);
+  return t * DECK_Y;
 }
 
-/** 脚下地表高度。currentY 用于在同一 xz 上区分"站水面"还是"站观星台"。 */
+/**
+ * 脚下地表高度。优先级 台面 > 坡道 > 水面（三区在各自足迹内不冲突：坡道底 h≈0 正好接水面）。
+ * 不在并集内时返回 currentY（移动求解会先把人夹回可行走区）。
+ */
 export function supportHeight(x: number, z: number, currentY: number): number {
-  const cands: number[] = [];
-  if (inCourt(x, z)) cands.push(0);
-  if (inDeck(x, z)) cands.push(DECK_Y);
-  if (inSteps(x, z)) cands.push(stepHeightAt(z));
-  if (cands.length === 0) return Math.max(0, currentY); // 兜底：保持高度（移动会先把人夹回可行走区）
-  let best = -Infinity;
-  for (const h of cands) if (h <= currentY + STEP_TOL && h > best) best = h;
-  if (best === -Infinity) best = Math.min(...cands); // 全都高于容差（不该发生）→ 取最低
-  return best;
+  if (inDeck(x, z)) return DECK_Y;
+  if (inSteps(x, z)) return rampHeightAt(z);
+  if (inCourt(x, z)) return 0;
+  return Math.max(0, currentY);
 }
 
 // 水上浮岛 + 写作台：圆柱碰撞（cx, cz, r）。
@@ -47,28 +57,22 @@ const COLLIDERS: [number, number, number][] = [
   [LECTERN[0], LECTERN[2], 0.5],
 ];
 
-// 沿障碍滑行（slide），而非径向弹出。弹出会在斜向擦碰时把人沿反方向"弹回来"
-// （实测复现：擦着浮岛走，切向位移会突然反向）。这里把本帧位移分解为"指向圆心(法向)"
-// 与"切向"两部分，只剔除指向圆心的那部分 → 贴着障碍顺滑绕行，不反弹。
+// 沿障碍滑行（slide），而非径向弹出。把本帧位移分解为"指向圆心(法向)"与"切向"两部分，
+// 只剔除指向圆心的那部分 → 贴着障碍顺滑绕行，不反弹。
 function slideColliders(fx: number, fz: number, x: number, z: number): [number, number] {
   let nx = x, nz = z;
   for (const [cx, cz, r] of COLLIDERS) {
     const minR = r + RADIUS;
     const dx = nx - cx, dz = nz - cz;
     if (Math.hypot(dx, dz) >= minR) continue; // 未侵入此障碍
-    // 接触法向取"来向一侧"（from 相对圆心），比从侵入点径向弹出更稳、不反弹
     let onx = fx - cx, onz = fz - cz;
     let ol = Math.hypot(onx, onz);
-    if (ol < 1e-4) { onx = dx; onz = dz; ol = Math.hypot(dx, dz); } // from 在圆心：退用目标方向
-    if (ol < 1e-4) { onx = 1; onz = 0; ol = 1; } // 全在圆心：任取一方向
+    if (ol < 1e-4) { onx = dx; onz = dz; ol = Math.hypot(dx, dz); }
+    if (ol < 1e-4) { onx = 1; onz = 0; ol = 1; }
     onx /= ol; onz /= ol;
-    const mvx = nx - fx, mvz = nz - fz; // 本帧位移
+    const mvx = nx - fx, mvz = nz - fz;
     const dot = mvx * onx + mvz * onz;
-    if (dot < 0) { // 朝障碍里走：剔除法向分量，只留切向（滑行）
-      nx = fx + (mvx - dot * onx);
-      nz = fz + (mvz - dot * onz);
-    }
-    // 滑完仍在体内（贴着面切向走）：径向顶到表面
+    if (dot < 0) { nx = fx + (mvx - dot * onx); nz = fz + (mvz - dot * onz); }
     const ax = nx - cx, az = nz - cz;
     const ad = Math.hypot(ax, az);
     if (ad < minR) {
@@ -79,33 +83,63 @@ function slideColliders(fx: number, fz: number, x: number, z: number): [number, 
   return [nx, nz];
 }
 
+/**
+ * 把期望落点夹进「广场∪坡道∪台面」并集——取**最近的那个区**的夹取结果。
+ * 这是修掉"走出台子边缘被瞬移回水圈"的关键：走过台子背沿时，最近区是台面边缘（就停在边上），
+ * 而不是把你径向投影到半径 8 的水圈（那会把人猛拉一大段）。
+ */
+function clampToWalkable(x: number, z: number): [number, number] {
+  const cands: [number, number][] = [];
+  // 水圈（圆盘）
+  const r = Math.hypot(x, z);
+  cands.push(r > R_COURT ? [(x / r) * R_COURT, (z / r) * R_COURT] : [x, z]);
+  // 台面矩形
+  cands.push([clamp(x, DECK.x0, DECK.x1), clamp(z, DECK.zFar, DECK.zNear)]);
+  // 坡道矩形
+  cands.push([clamp(x, STEPS.x0, STEPS.x1), clamp(z, STEPS.zTop, STEPS.zBottom)]);
+  let best = cands[0], bd = Infinity;
+  for (const c of cands) {
+    const d = Math.hypot(c[0] - x, c[1] - z);
+    if (d < bd) { bd = d; best = c; }
+  }
+  return best;
+}
+
 export interface Resolved {
   x: number;
   z: number;
   y: number; // 地表高度（脚），相机视高另加 EYE
 }
 
-/** 把期望落点夹进「广场∪木梯∪观星台」的并集。 */
-function clampToWalkable(x: number, z: number): [number, number] {
-  if (inDeck(x, z)) {
-    return [Math.max(DECK.x0, Math.min(DECK.x1, x)), Math.max(DECK.zFar, Math.min(DECK.zNear, z))];
-  }
-  if (inSteps(x, z)) {
-    return [Math.max(STEPS.x0, Math.min(STEPS.x1, x)), Math.max(STEPS.zTop, Math.min(STEPS.zBottom, z))];
-  }
-  // 广场：夹回半径内
-  const r = Math.hypot(x, z);
-  if (r > R_COURT) return [(x / r) * R_COURT, (z / r) * R_COURT];
-  return [x, z];
+/**
+ * 单次尝试：夹回可行走区 → 沿障碍滑行 → 再夹一次 → 求脚下高度。
+ * ok = 相对**起点地面**的抬升不超过 MAX_STEP_UP（撞上太高的坡壁=false，像墙挡住）。
+ * 注意比的是 from 的**地面高度**而非 prevY(相机视高/已阻尼)——否则跑步上坡时视高滞后会被误判为撞墙。
+ */
+function attempt(prevY: number, fromX: number, fromZ: number, tx: number, tz: number) {
+  let [x, z] = clampToWalkable(tx, tz);
+  [x, z] = slideColliders(fromX, fromZ, x, z);
+  [x, z] = clampToWalkable(x, z);
+  const y = supportHeight(x, z, prevY);
+  const fromY = supportHeight(fromX, fromZ, prevY);
+  return { x, z, y, ok: y - fromY <= MAX_STEP_UP };
 }
 
 /**
  * 给定上一帧位置(from)与本帧期望水平位置(want)，返回合法落点与脚下高度。
- * from 用于沿障碍滑行（不传则退化为原地求解：from=want）。
+ * 若整步会撞上过高的坡壁（MAX_STEP_UP），改为轴分离滑行（沿墙走），都不行才原地停。
  */
 export function resolveMove(prevY: number, fromX: number, fromZ: number, wantX: number, wantZ: number): Resolved {
-  let [x, z] = clampToWalkable(wantX, wantZ);
-  [x, z] = slideColliders(fromX, fromZ, x, z);
-  [x, z] = clampToWalkable(x, z); // 滑行后可能越界，再夹一次
-  return { x, z, y: supportHeight(x, z, prevY) };
+  const full = attempt(prevY, fromX, fromZ, wantX, wantZ);
+  if (full.ok) return { x: full.x, z: full.z, y: full.y };
+
+  // 撞上太高的坡壁 → 试只动 X / 只动 Z（沿墙滑行），取可行且更接近目标者。
+  const xOnly = attempt(prevY, fromX, fromZ, wantX, fromZ);
+  const zOnly = attempt(prevY, fromX, fromZ, fromX, wantZ);
+  const dist = (a: { x: number; z: number }) => Math.hypot(wantX - a.x, wantZ - a.z);
+  const ok = [xOnly, zOnly].filter((a) => a.ok).sort((a, b) => dist(a) - dist(b));
+  if (ok.length) return { x: ok[0].x, z: ok[0].z, y: ok[0].y };
+
+  // 全被挡：原地（高度按当前位置求）。
+  return { x: fromX, z: fromZ, y: supportHeight(fromX, fromZ, prevY) };
 }
