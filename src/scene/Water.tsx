@@ -6,7 +6,7 @@ import { RIPPLE_MAX, rippleData } from "./ripples";
 
 // 镜面水：一层半透明的深蓝玻璃。低头（视线接近垂直）几乎透明 → 看见水下被镜像的整片星空（星海）；
 // 掠射（接近水平）菲涅尔增强 → 泛起蓝色水光。脚步涟漪叠加在上面，打碎又重聚星海。
-// 水下的星空由 Sky 的镜像副本提供；暖灯的倒影由下方 MirrorBeacons 的镜像发光球提供。
+// "倒影"的实现是 Sky 在水面之下渲染的镜像副本（压暗），不是反射材质。
 
 const waterVert = /* glsl */ `
   varying vec3 vWorld;

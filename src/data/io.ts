@@ -1,5 +1,5 @@
 import type { Entry, Mood, RoomStyle, SavedWorld, Vec3, WorldConfig, Zone } from "../config/types";
-import { SAVE_FORMAT } from "../config/types";
+import { ENTRY_TYPES, MOODS, ROOM_STYLES, SAVE_FORMAT, ZONE_TYPES } from "../config/types";
 
 // 导出 / 导入：整个世界是一份你拥有的 JSON。
 // 这同时满足"数据归我、可塞进 OneDrive/Obsidian"与"导出再导入完整复现"。
@@ -8,11 +8,7 @@ import { SAVE_FORMAT } from "../config/types";
 // 因为渲染层信任 store 里的数据（不做防御性解构），所以非法数据一旦混入就会
 // 污染世界并落盘（刷新仍在），故这里要把它彻底挡在门外。这道门也是后期 AI
 // 写配置补丁时复用的同一道防线。
-
-const MOODS: readonly Mood[] = ["warm", "cool", "neutral", "rainy"];
-const ROOM_STYLES: readonly RoomStyle[] = ["loft", "study", "courtyard"];
-const ENTRY_TYPES = ["thought", "object", "track", "person"] as const;
-const ZONE_TYPES = ["bookshelf", "objects", "record"] as const;
+// 合法值数组与联合类型同源（config/types.ts），不在此手抄副本。
 
 export function buildSavedWorld(world: WorldConfig, entries: Entry[], now: number): SavedWorld {
   return {

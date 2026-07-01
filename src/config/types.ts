@@ -10,11 +10,15 @@
 
 export type Vec3 = [number, number, number];
 
+// 联合类型一律由 const 数组派生：io.ts 校验直接复用同一份数组，加一个成员只改这一处。
+
 /** 房间风格。MVP 只实现 loft，但类型预留其余以便"生长"。 */
-export type RoomStyle = "loft" | "study" | "courtyard";
+export const ROOM_STYLES = ["loft", "study", "courtyard"] as const;
+export type RoomStyle = (typeof ROOM_STYLES)[number];
 
 /** 心境：驱动光照 / 天气 / 配色。MVP 由用户手选，后期可由 AI / 内容聚合推导。 */
-export type Mood = "warm" | "cool" | "neutral" | "rainy";
+export const MOODS = ["warm", "cool", "neutral", "rainy"] as const;
+export type Mood = (typeof MOODS)[number];
 
 export interface Room {
   style: RoomStyle;
@@ -25,7 +29,8 @@ export interface Room {
 }
 
 /** MVP 三个功能区。 */
-export type ZoneType = "bookshelf" | "objects" | "record";
+export const ZONE_TYPES = ["bookshelf", "objects", "record"] as const;
+export type ZoneType = (typeof ZONE_TYPES)[number];
 
 export interface Zone {
   id: string;
@@ -37,8 +42,11 @@ export interface Zone {
   label: string;
 }
 
-export type EntryType = "thought" | "object" | "track" | "person";
-export type Primitive = "box" | "cylinder" | "sphere";
+export const ENTRY_TYPES = ["thought", "object", "track", "person"] as const;
+export type EntryType = (typeof ENTRY_TYPES)[number];
+
+export const PRIMITIVES = ["box", "cylinder", "sphere"] as const;
+export type Primitive = (typeof PRIMITIVES)[number];
 
 /**
  * 一条内容。所有"用户投入"都是 Entry：思考、物件、音轨……

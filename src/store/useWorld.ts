@@ -109,7 +109,7 @@ export const useWorld = create<WorldState>((set, get) => ({
   },
 
   hydrate: (world, entries) =>
-    set({ world, entries, focusedZoneId: null, selectedEntryId: null }),
+    set({ world, entries, focusedZoneId: null, selectedEntryId: null, hoveredZoneId: null, hoveredInReach: false }),
 }));
 
 // 注意（zustand v5 基于 useSyncExternalStore）：选择器若每次都返回新数组/对象，

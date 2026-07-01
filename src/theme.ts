@@ -113,6 +113,3 @@ export const PEDESTALS: { pos: Vec3; r: number; h: number }[] = [
   { pos: [3.7, 0, 3.6], r: 0.55, h: 0.7 },
   { pos: [3.9, 0, -3.4], r: 0.55, h: 0.7 },
 ];
-
-// 心境 → 氛围基调（沿用类型以备"生长"；本主题固定为冷夜 + 暖灯）
-export type Mood = "warm" | "cool" | "neutral" | "rainy";
