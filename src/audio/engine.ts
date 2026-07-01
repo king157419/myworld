@@ -9,9 +9,7 @@
 // 公开 API 与旧合成版保持完全兼容（PlayerControls / Hud / RecordPanel 无需改动）。
 // ─────────────────────────────────────────────────────────────────────────
 
-// 留声机坐标（与 src/theme.ts 的 GRAMOPHONE 保持一致：[0, DECK_Y, -9.4]）。
-// 这里硬编码副本以避免循环依赖；如主题改了请同步更新。
-const GRAMOPHONE_POS: [number, number, number] = [0, 1.45, -9.4];
+import { GRAMOPHONE } from "../theme";
 
 type Vec = [number, number, number];
 
@@ -148,7 +146,7 @@ export class AudioEngine {
     // —— 音乐总线（→ PannerNode @ GRAMOPHONE → master）——
     this.musicBus = ctx.createGain();
     this.musicBus.gain.value = 0; // 默认静音，setMusicPlaying(true) 后渐起
-    this.musicPanner = makePanner(ctx, GRAMOPHONE_POS);
+    this.musicPanner = makePanner(ctx, GRAMOPHONE);
     this.musicBus.connect(this.musicPanner).connect(this.master);
 
     // 异步加载音频，不 await（不阻塞 start() 返回，加载完成后自动开始播放）

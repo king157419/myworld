@@ -2,7 +2,7 @@ import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { Zone } from "../../config/types";
-import { BOOKWALL, LECTERN, PALETTE, ZONE_ANCHORS } from "../../theme";
+import { BOOKWALL, LECTERN, PALETTE, ZONE_ANCHORS, tideOffset } from "../../theme";
 import { useWorld } from "../../store/useWorld";
 import { useZoneEntries } from "../../ui/useZoneEntries";
 import { useInteractable } from "../interactables";
@@ -78,8 +78,7 @@ export default function Bookshelf({ zone }: { zone: Zone }) {
   useFrame((s) => {
     const g = glowGroupRef.current;
     if (!g) return;
-    const tide = Math.sin((s.clock.elapsedTime / 135) * Math.PI * 2) * 0.055;
-    g.position.y = tide * 0.3;
+    g.position.y = tideOffset(s.clock.elapsedTime) * 0.3;
   });
 
   const lightIntensity = 1.8 + Math.min(thoughts.length, 10) * 0.7;
