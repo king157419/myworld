@@ -57,7 +57,7 @@ function setPannerPos(p: PannerNode, x: number, y: number, z: number, t: number)
   }
 }
 
-/** fetch + decode，失败静默（不阻断渲染循环）。 */
+/** fetch + decode，失败静默（不阻断渲染循环）。用于水声等"拉到即解码"的资源。 */
 async function loadBuffer(ctx: AudioContext, url: string): Promise<AudioBuffer | null> {
   try {
     const res = await fetch(url);
@@ -69,6 +69,21 @@ async function loadBuffer(ctx: AudioContext, url: string): Promise<AudioBuffer |
     return await ctx.decodeAudioData(ab);
   } catch (e) {
     console.warn("[AudioEngine] decodeAudioData 失败:", url, e);
+    return null;
+  }
+}
+
+/** 只拉压缩字节不解码（曲库用：全库 PCM 常驻要几百 MB，压缩字节只有 ~21MB）。 */
+async function fetchBytes(url: string): Promise<ArrayBuffer | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.warn(`[AudioEngine] 加载失败 (${res.status}): ${url}`);
+      return null;
+    }
+    return await res.arrayBuffer();
+  } catch (e) {
+    console.warn("[AudioEngine] 拉取失败:", url, e);
     return null;
   }
 }
@@ -87,12 +102,16 @@ export class AudioEngine {
   private master!: GainNode;
 
   // —— 音乐总线（留声机空间化）+ 曲库 ——
+  // 内存策略：压缩字节（trackData，~21MB）常驻；PCM 只留"当前 + 预解码的下一首"两份
+  // （全库解码常驻是几百 MB，低端/移动设备直接把标签页挤掉——离场景的降级目标背道而驰）。
   private musicBus!: GainNode;
   private musicPanner!: PannerNode;
   private musicSource: AudioBufferSourceNode | null = null;
-  private trackBufs: (AudioBuffer | null)[] = [];
+  private trackData: (ArrayBuffer | null)[] = []; // null = 未加载或永久坏轨
+  private decoded = new Map<number, AudioBuffer>();
+  private playSeq = 0; // 播放请求令牌：快速连点切歌时只有最后一次生效
   private currentIndex = 0;
-  private onTrackChange?: (i: number) => void;
+  private onTrackChange?: (i: number, audible: boolean) => void;
 
   // —— 环境水声总线（全局）——
   private waterSource: AudioBufferSourceNode | null = null;
@@ -153,25 +172,19 @@ export class AudioEngine {
     void this.loadAndPlay(ctx);
   }
 
-  /** 加载环境水声 + 整套曲库并启动播放（首曲）。 */
+  /** 加载环境水声 + 曲库字节并起播首曲。水声独立起播——不等最慢的曲目下载。 */
   private async loadAndPlay(ctx: AudioContext): Promise<void> {
     // 噪声缓冲（雷声用，轻量，立即生成）
     this.noiseBuf = makeNoiseBuf(ctx, 3);
 
-    // 并行拉取：水声 + 全部曲目
-    const [waterBuf, ...trackBufs] = await Promise.all([
-      loadBuffer(ctx, audioUrl("water-ambient.ogg")),
-      ...TRACKS.map((t) => loadBuffer(ctx, audioUrl(t.file))),
-    ]);
-    this.trackBufs = trackBufs;
+    // —— 环境水声：自己的加载链，解码完立即循环（进场先听见水，是"落在水面上"的第一感）——
+    void loadBuffer(ctx, audioUrl("water-ambient.ogg")).then((buf) => {
+      if (buf && this.ctx) this.startWaterLoop(this.ctx, buf);
+    });
 
-    // —— 环境水声（循环，全局）——
-    if (waterBuf) {
-      this.startWaterLoop(ctx, waterBuf);
-    }
-
-    // —— 曲库：从当前曲目起播（放完自动接下一首）——
-    this.playCurrent();
+    // —— 曲库：只拉压缩字节，PCM 播放时按需解码 ——
+    this.trackData = await Promise.all(TRACKS.map((t) => fetchBytes(audioUrl(t.file))));
+    await this.playFrom(this.currentIndex);
     if (this.musicOn) {
       this.musicBus.gain.cancelScheduledValues(ctx.currentTime);
       this.musicBus.gain.setTargetAtTime(1, ctx.currentTime, 0.4);
@@ -187,39 +200,83 @@ export class AudioEngine {
     this.waterSource = src;
   }
 
-  /** 起播当前曲目：停掉旧源、从缓冲新建源，放完自动接下一首。 */
-  private playCurrent() {
-    if (!this.ctx) return;
-    if (this.musicSource) {
-      this.musicSource.onended = null; // 主动切换：别让 onended 误触发自动下一首
-      try { this.musicSource.stop(); } catch { /* 已停止 */ }
-      this.musicSource = null;
+  private stopSource() {
+    if (!this.musicSource) return;
+    this.musicSource.onended = null; // 主动切换：别让 onended 误触发自动下一首
+    try { this.musicSource.stop(); } catch { /* 已停止 */ }
+    this.musicSource = null;
+  }
+
+  /** 解码某曲（带缓存）。decodeAudioData 会 detach 传入的 buffer → 必须喂 slice 出的副本。 */
+  private async decodeTrack(i: number): Promise<AudioBuffer | null> {
+    const hit = this.decoded.get(i);
+    if (hit) return hit;
+    const data = this.trackData[i];
+    if (!data || !this.ctx) return null;
+    try {
+      const buf = await this.ctx.decodeAudioData(data.slice(0));
+      this.decoded.set(i, buf);
+      return buf;
+    } catch (e) {
+      console.warn("[AudioEngine] 曲目解码失败，标记坏轨:", TRACKS[i]?.file, e);
+      this.trackData[i] = null; // 永久坏轨：以后直接跳过
+      return null;
     }
-    const buf = this.trackBufs[this.currentIndex];
-    if (!buf) { this.onTrackChange?.(this.currentIndex); return; } // 尚未加载完
-    const src = this.ctx.createBufferSource();
-    src.buffer = buf;
-    src.loop = false;
-    src.connect(this.musicBus);
-    src.onended = () => { if (this.musicSource === src) this.next(); }; // 自然播完 → 下一首
-    src.start();
-    this.musicSource = src;
-    this.onTrackChange?.(this.currentIndex);
+  }
+
+  /** PCM 缓存只留这些下标（当前 + 预解码的下一首），其余释放。 */
+  private pruneDecoded(keep: number[]) {
+    for (const k of [...this.decoded.keys()]) {
+      if (!keep.includes(k)) this.decoded.delete(k);
+    }
+  }
+
+  /**
+   * 从 start 起播第一首可解码的曲目：坏轨自动向后跳（最多一整圈），全坏则如实上报停止——
+   * 之前坏轨会静默停摆，而引擎和 UI 都还声称"正在播放"（两份真相分道扬镳）。
+   */
+  private async playFrom(start: number): Promise<void> {
+    if (!this.ctx) { this.currentIndex = ((start % TRACKS.length) + TRACKS.length) % TRACKS.length; return; }
+    const seq = ++this.playSeq;
+    this.stopSource();
+    for (let hop = 0; hop < TRACKS.length; hop++) {
+      const i = (((start + hop) % TRACKS.length) + TRACKS.length) % TRACKS.length;
+      const buf = await this.decodeTrack(i);
+      if (seq !== this.playSeq) return; // 等解码期间来了新的播放请求：让位
+      if (!buf) continue;
+      this.currentIndex = i;
+      const src = this.ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = false;
+      src.connect(this.musicBus);
+      src.onended = () => { if (this.musicSource === src) void this.playFrom(i + 1); }; // 自然播完 → 下一首
+      src.start();
+      this.musicSource = src;
+      this.onTrackChange?.(i, this.musicOn);
+      // 预解码下一首、释放更早的 PCM
+      const next = (i + 1) % TRACKS.length;
+      this.pruneDecoded([i, next]);
+      void this.decodeTrack(next);
+      return;
+    }
+    // 一整圈都放不出来：停止并如实上报（UI 不再假装在放）
+    this.musicOn = false;
+    this.onTrackChange?.(this.currentIndex, false);
   }
 
   // ── 曲库控制 ──────────────────────────────────────────────────────────
   get trackList(): TrackMeta[] { return TRACKS; }
   get currentTrack(): number { return this.currentIndex; }
-  setOnTrackChange(cb: (i: number) => void): void { this.onTrackChange = cb; }
+  /** 换曲/坏轨跳过/全库失败时回调：(落到的曲目下标, 是否可听)。 */
+  setOnTrackChange(cb: (i: number, audible: boolean) => void): void { this.onTrackChange = cb; }
 
-  /** 点选某曲目播放（i 越界忽略）。 */
+  /** 点选某曲目播放（i 越界忽略）。落到哪一首以 onTrackChange 回报为准（坏轨会向后跳）。 */
   playTrack(i: number): void {
     if (i < 0 || i >= TRACKS.length) return;
-    this.currentIndex = i;
-    this.playCurrent();
+    void this.playFrom(i);
   }
-  next(): void { this.playTrack((this.currentIndex + 1) % TRACKS.length); }
-  prev(): void { this.playTrack((this.currentIndex - 1 + TRACKS.length) % TRACKS.length); }
+  next(): void { void this.playFrom(this.currentIndex + 1); }
+  prev(): void { void this.playFrom(this.currentIndex - 1 + TRACKS.length); }
 
   // ── 远雷（天气层在闪电后延迟调用） ────────────────────────────────────
 
@@ -300,8 +357,10 @@ export class AudioEngine {
     } catch {
       // 已停止的节点 stop() 会抛出，忽略
     }
+    this.playSeq++; // 作废在途的解码/播放请求
     this.waterSource = null;
     this.musicSource = null;
+    this.decoded.clear();
     void this.ctx?.close();
     this.ctx = null;
   }

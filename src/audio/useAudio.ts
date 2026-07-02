@@ -36,12 +36,18 @@ export const useAudio = create<AudioState>((set, get) => ({
   currentTrack: 0,
 
   start: async () => {
-    if (get().started) return;
-    // 引擎自动换曲（放完接下一首）时回写当前曲目，UI 高亮跟随。
-    audioEngine.setOnTrackChange((i) => set({ currentTrack: i }));
+    // 可重入：已启动时再调仍会 await engine.start() → resume 被挂起的 AudioContext
+    //（之前 started 早退让 resume 路径永远不可达）。
+    const first = !get().started;
+    if (first) {
+      // 引擎换曲/坏轨跳过/全库失败时回报（下标, 是否可听），UI 跟随真实状态。
+      audioEngine.setOnTrackChange((i, audible) => set({ currentTrack: i, musicPlaying: audible }));
+    }
     await audioEngine.start();
-    audioEngine.setMusicPlaying(true);
-    set({ started: true, musicPlaying: true, currentTrack: audioEngine.currentTrack });
+    if (first) {
+      audioEngine.setMusicPlaying(true);
+      set({ started: true, musicPlaying: true, currentTrack: audioEngine.currentTrack });
+    }
   },
 
   setMusic: (on) => {
@@ -56,20 +62,22 @@ export const useAudio = create<AudioState>((set, get) => ({
     set({ muted: m });
   },
 
+  // 切歌是异步的（按需解码 + 坏轨跳过），最终落到哪一首由 onTrackChange 回报——
+  // 这里只表达意图（确保在放），不抢先写 currentTrack。
   playTrack: (i) => {
-    audioEngine.playTrack(i);
     audioEngine.setMusicPlaying(true);
-    set({ currentTrack: i, musicPlaying: true });
+    set({ musicPlaying: true });
+    audioEngine.playTrack(i);
   },
   nextTrack: () => {
-    audioEngine.next();
     audioEngine.setMusicPlaying(true);
-    set({ currentTrack: audioEngine.currentTrack, musicPlaying: true });
+    set({ musicPlaying: true });
+    audioEngine.next();
   },
   prevTrack: () => {
-    audioEngine.prev();
     audioEngine.setMusicPlaying(true);
-    set({ currentTrack: audioEngine.currentTrack, musicPlaying: true });
+    set({ musicPlaying: true });
+    audioEngine.prev();
   },
 }));
 
