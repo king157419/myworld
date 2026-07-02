@@ -1,4 +1,4 @@
-import { useRef, useMemo, useEffect } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { R_COURT, tidePhase, LECTERN } from "../theme";
@@ -12,12 +12,16 @@ import type { Entry } from "../config/types";
 // 每一条思考（Entry type="thought", zoneId="zone-bookshelf"）在水下对应一颗
 // 微弱的生物荧光点：随潮汐缓缓沉浮，随涨潮渐亮，随落潮渐暗。
 // 写下新思考时：光点从写作台位置下沉到它的安息深度，触发一圈涟漪。
+//
+// 渲染结构：两个 InstancedMesh（核心球 + 晕圈球）+ 父组件单个 useFrame。
+// 这是场景里唯一随用户内容无界生长的部分——之前每颗光点自带 useFrame、每帧各调一次
+// Date.now()、各持两份透明材质（60 颗 = 60 个回调 + 120 个无法合批的透明 draw）。
+// 透明度折进 instanceColor：加色混合下 (色×α, opacity 1) ≡ (色, opacity α)，逐实例可调。
 // ─────────────────────────────────────────────────────────────────────────────
 
 const MAX_MOTES = 60;
 const SINK_DURATION = 3.5; // 秒：新思考从水面沉到安息位的动画时长
 
-// 光点核心半径 / 晕圈半径
 const CORE_R = 0.065;
 const HALO_R = 0.22;
 
@@ -62,110 +66,27 @@ interface MoteState {
   x: number;
   z: number;
   restY: number;
-  bobPhase: number;       // 慢漂 Y 相位（由 id 派生，0..2π）
-  driftPhaseX: number;    // x 方向漂移相位
-  driftPhaseZ: number;    // z 方向漂移相位
+  bobPhase: number;
+  driftPhaseX: number;
+  driftPhaseZ: number;
   sinkTriggered: boolean; // 已触发落水涟漪
 }
 
-// ─── 单个光点：核心球 + 晕圈球 ───────────────────────────────────────────────
-interface MoteInstanceProps {
-  state: MoteState;
-  coreGeo: THREE.SphereGeometry;
-  haloGeo: THREE.SphereGeometry;
+function makeState(entry: Entry): MoteState {
+  const { x, z, restY } = stablePosition(entry.id);
+  const [h1, h2, h3] = idHash(entry.id);
+  return {
+    entry,
+    x,
+    z,
+    restY,
+    bobPhase: h1 * Math.PI * 2,
+    driftPhaseX: h2 * Math.PI * 2,
+    driftPhaseZ: h3 * Math.PI * 2,
+    sinkTriggered: false,
+  };
 }
 
-function MoteInstance({ state, coreGeo, haloGeo }: MoteInstanceProps) {
-  const coreRef = useRef<THREE.Mesh>(null);
-  const haloRef = useRef<THREE.Mesh>(null);
-
-  // 每个光点各自独立的材质实例（需独立控制 opacity）
-  const coreMat = useMemo(
-    () =>
-      new THREE.MeshBasicMaterial({
-        color: CORE_COLOR,
-        transparent: true,
-        opacity: 0.7,
-        depthWrite: false,
-        toneMapped: false,
-        blending: THREE.AdditiveBlending,
-      }),
-    [],
-  );
-  const haloMat = useMemo(
-    () =>
-      new THREE.MeshBasicMaterial({
-        color: HALO_COLOR,
-        transparent: true,
-        opacity: 0.12,
-        depthWrite: false,
-        toneMapped: false,
-        blending: THREE.AdditiveBlending,
-      }),
-    [],
-  );
-
-  useEffect(() => {
-    return () => {
-      coreMat.dispose();
-      haloMat.dispose();
-    };
-  }, [coreMat, haloMat]);
-
-  useFrame((s) => {
-    const t = s.clock.elapsedTime;
-    const ageSec = (Date.now() - state.entry.createdAt) / 1000;
-    let curX: number;
-    let curZ: number;
-    let curY: number;
-
-    if (ageSec < SINK_DURATION) {
-      // 沉入动画：从写作台 (LECTERN) 水面 y=0 沿 ease-out cubic 下沉到安息位。
-      const prog = Math.max(0, Math.min(1, ageSec / SINK_DURATION));
-      const ease = 1 - Math.pow(1 - prog, 3);
-      curX = LECTERN[0] + (state.x - LECTERN[0]) * ease;
-      curZ = LECTERN[2] + (state.z - LECTERN[2]) * ease;
-      const tideShift = (tidePhase(t) - 0.5) * 0.35;
-      curY = (state.restY + tideShift) * ease; // 从 y=0 平滑下沉
-
-      // 首帧触发涟漪（仅一次）
-      if (!state.sinkTriggered) {
-        spawnRipple(LECTERN[0], LECTERN[2], t, 1.4);
-        state.sinkTriggered = true;
-      }
-    } else {
-      // 安息状态：潮汐缓升降 + 个性慢漂
-      const tideShift = (tidePhase(t) - 0.5) * 0.35;
-      const bobY = Math.sin(t * 0.22 + state.bobPhase) * 0.045;
-      const driftX = Math.sin(t * 0.11 + state.driftPhaseX) * 0.12;
-      const driftZ = Math.cos(t * 0.09 + state.driftPhaseZ) * 0.12;
-      curX = state.x + driftX;
-      curZ = state.z + driftZ;
-      curY = state.restY + tideShift + bobY;
-    }
-
-    if (coreRef.current) coreRef.current.position.set(curX, curY, curZ);
-    if (haloRef.current) haloRef.current.position.set(curX, curY, curZ);
-
-    // 深度 → 透明度：curY ≈ -0.1（高潮浅处）~ -1.6（低潮深处）
-    // depthFactor: 0=深沉, 1=近水面
-    const depthFactor = Math.max(0, Math.min(1, (curY + 1.6) / 1.5));
-    const baseAlpha = 0.3 + depthFactor * 0.6; // 0.3 ~ 0.9
-    coreMat.opacity = Math.min(1, baseAlpha * 1.1);
-    haloMat.opacity = baseAlpha * 0.20;
-  });
-
-  return (
-    <>
-      {/* 核心亮点 */}
-      <mesh ref={coreRef} geometry={coreGeo} material={coreMat} />
-      {/* 柔光晕圈 */}
-      <mesh ref={haloRef} geometry={haloGeo} material={haloMat} />
-    </>
-  );
-}
-
-// ─── 主组件 ───────────────────────────────────────────────────────────────────
 export default function SunkenThoughts() {
   // zustand v5 selector 规则：不在选择器里 filter（getSnapshot 循环）。
   // useZoneEntries 在 useMemo 里 filter，符合规范。
@@ -174,75 +95,98 @@ export default function SunkenThoughts() {
   // 最多渲染 MAX_MOTES 条（hook 已按 createdAt 倒序，最新在前）
   const visible = useMemo(() => thoughts.slice(0, MAX_MOTES), [thoughts]);
 
-  // 共享几何（所有光点复用同一份，unmount 时统一 dispose）
-  const coreGeo = useMemo(() => new THREE.SphereGeometry(CORE_R, 8, 6), []);
-  const haloGeo = useMemo(() => new THREE.SphereGeometry(HALO_R, 8, 6), []);
+  const coreRef = useRef<THREE.InstancedMesh>(null);
+  const haloRef = useRef<THREE.InstancedMesh>(null);
+  const states = useRef<Map<string, MoteState>>(new Map());
 
+  // 同步 visible 变化：清理已删除的、更新 entry 引用（新增在帧循环里惰性建，保证首帧即现）。
   useEffect(() => {
-    return () => {
-      coreGeo.dispose();
-      haloGeo.dispose();
-    };
-  }, [coreGeo, haloGeo]);
-
-  // 运行时状态 Map：id → MoteState（存在 ref 里，不触发 re-render）
-  const moteStatesRef = useRef<Map<string, MoteState>>(new Map());
-
-  // 同步 visible 变化到 moteStatesRef：添加新条目、更新 entry 引用、清理已删除的。
-  useEffect(() => {
-    const map = moteStatesRef.current;
-    const currentIds = new Set(visible.map((e) => e.id));
-
-    // 清理已删除的条目
+    const map = states.current;
+    const ids = new Set(visible.map((e) => e.id));
     for (const id of map.keys()) {
-      if (!currentIds.has(id)) map.delete(id);
+      if (!ids.has(id)) map.delete(id);
     }
-
-    // 添加新条目 / 更新现有的 entry 引用
     for (const entry of visible) {
-      if (!map.has(entry.id)) {
-        const { x, z, restY } = stablePosition(entry.id);
-        const [h1, h2, h3] = idHash(entry.id);
-        map.set(entry.id, {
-          entry,
-          x,
-          z,
-          restY,
-          bobPhase: h1 * Math.PI * 2,
-          driftPhaseX: h2 * Math.PI * 2,
-          driftPhaseZ: h3 * Math.PI * 2,
-          sinkTriggered: false,
-        });
-      } else {
-        // entry 引用可能在编辑后更新（createdAt 不变，状态保持）
-        const s = map.get(entry.id)!;
-        s.entry = entry;
-      }
+      const st = map.get(entry.id);
+      if (st) st.entry = entry; // 编辑后引用更新（createdAt 不变，状态保持）
     }
   }, [visible]);
 
+  const tmpMat = useMemo(() => new THREE.Matrix4(), []);
+  const tmpCol = useMemo(() => new THREE.Color(), []);
+
+  useFrame((s) => {
+    const core = coreRef.current;
+    const halo = haloRef.current;
+    if (!core || !halo) return;
+    const t = s.clock.elapsedTime;
+    const now = Date.now(); // 每帧一次，60 颗共用
+    const tideShift = (tidePhase(t) - 0.5) * 0.35;
+
+    let n = 0;
+    for (const entry of visible) {
+      let st = states.current.get(entry.id);
+      if (!st) {
+        st = makeState(entry);
+        states.current.set(entry.id, st);
+      }
+      const ageSec = (now - entry.createdAt) / 1000;
+      let curX: number;
+      let curZ: number;
+      let curY: number;
+
+      if (ageSec < SINK_DURATION) {
+        // 沉入动画：从写作台 (LECTERN) 水面 y=0 沿 ease-out cubic 下沉到安息位。
+        const prog = Math.max(0, Math.min(1, ageSec / SINK_DURATION));
+        const ease = 1 - Math.pow(1 - prog, 3);
+        curX = LECTERN[0] + (st.x - LECTERN[0]) * ease;
+        curZ = LECTERN[2] + (st.z - LECTERN[2]) * ease;
+        curY = (st.restY + tideShift) * ease; // 从 y=0 平滑下沉
+
+        if (!st.sinkTriggered) {
+          spawnRipple(LECTERN[0], LECTERN[2], t, 1.4);
+          st.sinkTriggered = true;
+        }
+      } else {
+        // 安息状态：潮汐缓升降 + 个性慢漂
+        const bobY = Math.sin(t * 0.22 + st.bobPhase) * 0.045;
+        curX = st.x + Math.sin(t * 0.11 + st.driftPhaseX) * 0.12;
+        curZ = st.z + Math.cos(t * 0.09 + st.driftPhaseZ) * 0.12;
+        curY = st.restY + tideShift + bobY;
+      }
+
+      tmpMat.makeTranslation(curX, curY, curZ);
+      core.setMatrixAt(n, tmpMat);
+      halo.setMatrixAt(n, tmpMat);
+
+      // 深度 → 亮度：curY ≈ -0.1（高潮浅处）~ -1.6（低潮深处）
+      const depthFactor = Math.max(0, Math.min(1, (curY + 1.6) / 1.5));
+      const baseAlpha = 0.3 + depthFactor * 0.6; // 0.3 ~ 0.9
+      core.setColorAt(n, tmpCol.copy(CORE_COLOR).multiplyScalar(Math.min(1, baseAlpha * 1.1)));
+      halo.setColorAt(n, tmpCol.copy(HALO_COLOR).multiplyScalar(baseAlpha * 0.2));
+      n++;
+    }
+
+    core.count = n;
+    halo.count = n;
+    core.instanceMatrix.needsUpdate = true;
+    halo.instanceMatrix.needsUpdate = true;
+    if (core.instanceColor) core.instanceColor.needsUpdate = true;
+    if (halo.instanceColor) halo.instanceColor.needsUpdate = true;
+  });
+
   return (
     <group name="sunken-thoughts">
-      {visible.map((entry) => {
-        // 渲染期惰性建状态：保证首帧（内容刚加载时）光点立即出现，不依赖 effect 先跑。
-        let state = moteStatesRef.current.get(entry.id);
-        if (!state) {
-          const { x, z, restY } = stablePosition(entry.id);
-          const [h1, h2, h3] = idHash(entry.id);
-          state = { entry, x, z, restY, bobPhase: h1 * Math.PI * 2, driftPhaseX: h2 * Math.PI * 2, driftPhaseZ: h3 * Math.PI * 2, sinkTriggered: false };
-          moteStatesRef.current.set(entry.id, state);
-        } else {
-          state.entry = entry;
-        }
-        return (
-          <MoteInstance
-            key={entry.id}
-            state={state}
-            coreGeo={coreGeo}
-            haloGeo={haloGeo}
-          />
-        );
-      })}
+      {/* 核心亮点（实例化） */}
+      <instancedMesh ref={coreRef} args={[undefined, undefined, MAX_MOTES]} frustumCulled={false}>
+        <sphereGeometry args={[CORE_R, 8, 6]} />
+        <meshBasicMaterial transparent depthWrite={false} toneMapped={false} blending={THREE.AdditiveBlending} />
+      </instancedMesh>
+      {/* 柔光晕圈（实例化） */}
+      <instancedMesh ref={haloRef} args={[undefined, undefined, MAX_MOTES]} frustumCulled={false}>
+        <meshBasicMaterial transparent depthWrite={false} toneMapped={false} blending={THREE.AdditiveBlending} />
+        <sphereGeometry args={[HALO_R, 8, 6]} />
+      </instancedMesh>
     </group>
   );
 }
