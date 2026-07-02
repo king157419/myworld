@@ -95,8 +95,11 @@ export default function BookWall() {
       <instancedMesh ref={meshRef} args={[spineGeom, undefined, instances.length]} castShadow frustumCulled={false}>
         <meshStandardMaterial roughness={0.82} metalness={0.0} />
       </instancedMesh>
-      {/* 书墙暖补光（无影、克制）：给整面墙横向的可读层次，别让它糊成一块暗板 */}
+      {/* 书墙暖补光（无影、克制）：给整面墙横向的可读层次，别让它糊成一块暗板。
+          一盏只照得亮弧的中段——两端各补一盏，整面墙的书脊颜色才读得出来 */}
       <pointLight position={[-5.2, 2.2, -0.5]} color={PALETTE.lampWarm} intensity={2.2} distance={7} decay={2} />
+      <pointLight position={[-5.6, 2.4, 4.2]} color={PALETTE.lampWarm} intensity={1.8} distance={6.5} decay={2} />
+      <pointLight position={[-5.6, 2.4, -4.8]} color={PALETTE.lampWarm} intensity={1.8} distance={6.5} decay={2} />
     </group>
   );
 }

@@ -22,8 +22,9 @@ export default function Lighting({ low = false }: { low?: boolean }) {
           天空与水是自定义 shader 不受雾影响，星海始终清澈 */}
       <fogExp2 attach="fog" args={[preset.fogColor, preset.fogDensity]} />
       <group>
-      <ambientLight intensity={0.32 * preset.ambientMul} color={preset.ambientColor} />
-      <hemisphereLight args={["#2c3f72", "#0a0d16", preset.hemiIntensity]} />
+      {/* 环境地板：0.32 时中间调死黑（书墙近看是黑褐糊团），抬到 0.42 暗部才有信息；夜的感觉交给对比与色温 */}
+      <ambientLight intensity={0.42 * preset.ambientMul} color={preset.ambientColor} />
+      <hemisphereLight args={["#33477e", "#0d1119", preset.hemiIntensity * 1.25]} />
       <directionalLight
         position={moonPos.toArray()}
         intensity={0.95}
@@ -42,20 +43,21 @@ export default function Lighting({ low = false }: { low?: boolean }) {
       />
       {/* 观星台暖色补光：给台子和留声机一点存在感与停留的暖意（锚在 GRAMOPHONE 邻域，挪留声机时跟着走） */}
       <pointLight position={[GRAMOPHONE[0], DECK_Y + 1.3, GRAMOPHONE[2] + 0.2]} color={PALETTE.lampWarm} intensity={4.5 * preset.lampMul} distance={9} decay={2} />
-      {/* 广场低位暖溢光：贴着水面抬一点暗部，但不投影、范围克制 */}
-      <pointLight position={[0, 0.8, 1.5]} color={"#ffca82"} intensity={1.6 * preset.lampMul} distance={9} decay={2} />
-      {/* 更厚的 IBL：黄铜/金属反射"暖灯池 + 冷天 + 暖地"，不死黑；ring 形给喇叭一道可信的圆弧高光。 */}
+      {/* 广场低位暖溢光：贴着水面抬一点暗部。反射水面上它会积成大团镜面光潭——1.6 太满，收到 1.0 */}
+      <pointLight position={[0, 0.8, 1.5]} color={"#ffca82"} intensity={1.0 * preset.lampMul} distance={9} decay={2} />
+      {/* 更厚的 IBL：黄铜/金属反射"暖灯池 + 冷天 + 暖地"，不死黑；ring 形给喇叭一道可信的圆弧高光。
+          第十轮整体加厚 ~40%：留声机喇叭大片死黑的根因就是 env 无东西可反。 */}
       <Environment resolution={low ? 96 : 256} frames={1}>
         {/* 冷天穹（顶） */}
-        <Lightformer intensity={0.55} color={"#26396a"} position={[0, 10, 0]} scale={[30, 30, 1]} target={[0, 0, 0]} />
+        <Lightformer intensity={0.75} color={"#26396a"} position={[0, 10, 0]} scale={[30, 30, 1]} target={[0, 0, 0]} />
         {/* 主暖光池（书墙一侧，最强反射来源） */}
-        <Lightformer form="rect" intensity={1.6} color={PALETTE.lampWarm} position={[-6, 2.2, 3]} scale={[8, 8, 1]} target={[0, 1.2, 0]} />
+        <Lightformer form="rect" intensity={2.2} color={PALETTE.lampWarm} position={[-6, 2.2, 3]} scale={[8, 8, 1]} target={[0, 1.2, 0]} />
         {/* 观星台暖光池（留声机黄铜的暖反射） */}
-        <Lightformer form="ring" intensity={1.5} color={PALETTE.glowAmber} position={[1.5, 2.6, -6]} scale={[5, 5, 1]} target={[0, 1.6, -9]} />
+        <Lightformer form="ring" intensity={2.0} color={PALETTE.glowAmber} position={[1.5, 2.6, -6]} scale={[5, 5, 1]} target={[0, 1.6, -9]} />
         {/* 冷侧补（浮岛一侧，给金属冷暖相间） */}
-        <Lightformer form="rect" intensity={0.6} color={"#9fb6e0"} position={[6, 3, -6]} scale={[9, 9, 1]} target={[0, 1, 0]} />
+        <Lightformer form="rect" intensity={0.85} color={"#9fb6e0"} position={[6, 3, -6]} scale={[9, 9, 1]} target={[0, 1, 0]} />
         {/* 暖地反射（水面把暖意反上来，金属底面不死黑） */}
-        <Lightformer intensity={0.35} color={"#3a2a18"} position={[0, -2, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[26, 26, 1]} />
+        <Lightformer intensity={0.55} color={"#4a3520"} position={[0, -2, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[26, 26, 1]} />
       </Environment>
       </group>
     </>

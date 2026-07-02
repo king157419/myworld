@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { DECK_Y, GRAMOPHONE, PALETTE } from "../../theme";
 import { CUP_PROFILE, POST_PROFILE, BULB_PROFILE, V2 } from "./profiles";
 import { brassMat, paperMat, woodWarmMat } from "./materials";
+import { GlowSprite } from "./glow";
 
 // 观星台上、留声机旁的"听歌角"：毯子 + 靠垫 + 一盏暖台灯 —— 给登顶一个停留的理由。
 // 整组以 GRAMOPHONE 锚点定位（挪留声机时听歌角跟着走），组内坐标全是相对偏移。
@@ -69,12 +70,9 @@ export default function ListeningNook() {
         </mesh>
         <mesh position={[0, 1.08, 0]}>
           <latheGeometry args={[BULB_PROFILE, 18]} />
-          <meshStandardMaterial color={PALETTE.lampCore} emissive={new THREE.Color(PALETTE.lampWarm)} emissiveIntensity={1.5} roughness={0.5} toneMapped={false} />
+          <meshStandardMaterial color={PALETTE.lampCore} emissive={new THREE.Color(PALETTE.lampWarm)} emissiveIntensity={1.25} roughness={0.5} toneMapped={false} />
         </mesh>
-        <mesh position={[0, 1.12, 0]}>
-          <sphereGeometry args={[0.32, 16, 16]} />
-          <meshBasicMaterial color={PALETTE.lampWarm} transparent opacity={0.1} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-        </mesh>
+        <GlowSprite position={[0, 1.1, 0]} color={PALETTE.lampWarm} scale={0.95} opacity={0.32} />
         <pointLight position={[0, 1.1, 0]} color={PALETTE.lampWarm} intensity={3.6} distance={6} decay={2} />
       </group>
     </group>

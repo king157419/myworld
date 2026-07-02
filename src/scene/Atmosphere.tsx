@@ -6,6 +6,7 @@ import { spawnRipple } from "./ripples";
 import { useWorld } from "../store/useWorld";
 import { MOOD_PRESETS } from "../config/moods";
 import { audioEngine } from "../audio/engine";
+import Starfall from "./Starfall";
 
 // 氛围：贴着水面缓缓漂移的薄雾 + 空气里悬浮的微尘/萤火 + （雨夜）偶发远雷。
 // 心境在此消费：薄雾颜色/浓度按 MOOD_PRESETS 调制，rainy 档启用远雷。
@@ -169,6 +170,8 @@ export default function Atmosphere() {
     <group>
       <Mist color={preset.mistColor} strength={preset.mistMul} />
       <Motes />
+      {/* 星光柱：雨夜云厚，星光落不下来 */}
+      <Starfall visible={!preset.thunder} />
       {preset.thunder && <DistantThunder />}
     </group>
   );

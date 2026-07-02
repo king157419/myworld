@@ -22,7 +22,7 @@ export default function PostFX({ low = false }: { low?: boolean }) {
   return (
     <EffectComposer multisampling={0} enableNormalPass={false}>
       <SMAA />
-      <Bloom intensity={0.62} luminanceThreshold={0.82} luminanceSmoothing={0.92} mipmapBlur radius={0.76} />
+      <Bloom intensity={0.7} luminanceThreshold={0.85} luminanceSmoothing={0.92} mipmapBlur radius={0.76} />
       <HueSaturation saturation={0.1} hue={0} />
       <BrightnessContrast brightness={0.03} contrast={0.1} />
       <ToneMapping mode={ToneMappingMode.AGX} />

@@ -19,9 +19,11 @@ const LIFT = 0.0; // 需要时整体抬高一点点贴合台面
 // doubleSide：喇叭是单层薄壳，不开双面则从口往里看是"黑洞剪影"——内壁开双面 + 暖自发光，从里发金。
 type Spec = { color: string; metalness: number; roughness: number; emissive?: string; emissiveIntensity?: number; doubleSide?: boolean };
 const REMAT: Record<string, Spec> = {
-  mat19: { color: PALETTE.brass, metalness: 0.6, roughness: 0.45, emissive: PALETTE.glowAmber, emissiveIntensity: 0.2, doubleSide: true }, // 喇叭主体（内外同面）：降金属度+暖自发光，内壁不再是黑镜
-  mat18: { color: "#e6c184", metalness: 0.55, roughness: 0.42, emissive: PALETTE.glowAmber, emissiveIntensity: 0.55, doubleSide: true }, // 喇叭内唇：自发光金
-  mat16: { color: "#7a5f34", metalness: 0.82, roughness: 0.42 }, // 喇叭颈 / 暗黄铜
+  // 喇叭主体：第九轮 metal 0.6 / emissive 0.2 在薄 env 下仍大片死黑（近看破相，审计 F1）——
+  // 再降金属度让暖点光的漫反射接手，自发光抬到"内壁常暖"的量级
+  mat19: { color: PALETTE.brass, metalness: 0.42, roughness: 0.5, emissive: PALETTE.glowAmber, emissiveIntensity: 0.42, doubleSide: true },
+  mat18: { color: "#e6c184", metalness: 0.4, roughness: 0.45, emissive: PALETTE.glowAmber, emissiveIntensity: 0.7, doubleSide: true }, // 喇叭内唇：自发光金
+  mat16: { color: "#7a5f34", metalness: 0.7, roughness: 0.45 }, // 喇叭颈 / 暗黄铜
   mat15: { color: "#9aa0a6", metalness: 0.8, roughness: 0.5 }, // 钢件（唱针臂）—— 提 roughness 压掉刺眼白斑
   mat22: { color: "#5a5e66", metalness: 0.65, roughness: 0.52 }, // 暗金属件
   mat20: { color: PALETTE.woodWarm, metalness: 0.08, roughness: 0.62 }, // 木箱
@@ -47,6 +49,7 @@ function Model() {
           std.color = new THREE.Color(spec.color);
           std.metalness = spec.metalness;
           std.roughness = spec.roughness;
+          std.envMapIntensity = 1.5; // 金属件多吃一点 IBL——env 再厚，默认 1.0 对小曲面仍偏薄
           if (spec.emissive) {
             std.emissive = new THREE.Color(spec.emissive);
             std.emissiveIntensity = spec.emissiveIntensity ?? 0;
@@ -78,10 +81,11 @@ function Model() {
       <group position={[0, LIFT, 0]}>
         <primitive object={model} />
       </group>
-      {/* 喇叭口内的暖光：摆在钟口里，掠照内壁让它发金（局部短射程，避免溢到唱盘成白斑）*/}
-      <pointLight position={[0, 0.62, -0.32]} color={PALETTE.lampCore} intensity={1.5} distance={1.5} decay={2} />
+      {/* 喇叭口内的暖光：摆进钟口中心。第九轮 1.5/1.5m 照不到钟口上缘内壁——
+          从口外看进去是一片死黑"透镜"（审计 F1 复发的真根因，raycast 实证）*/}
+      <pointLight position={[0, 0.85, -0.42]} color={PALETTE.lampCore} intensity={3.3} distance={2.4} decay={2} />
       {/* 喉部柔补 */}
-      <pointLight position={[0, 0.24, -0.08]} color={PALETTE.lampWarm} intensity={0.8} distance={1.3} decay={2} />
+      <pointLight position={[0, 0.24, -0.08]} color={PALETTE.lampWarm} intensity={1.7} distance={2.4} decay={2} />
     </group>
   );
 }

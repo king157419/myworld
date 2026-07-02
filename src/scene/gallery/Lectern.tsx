@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { LECTERN, PALETTE } from "../../theme";
 import { POST_PROFILE, SMALL_BULB, V2 } from "./profiles";
 import { brassMat, woodWarmMat } from "./materials";
+import { GlowSprite } from "./glow";
 
 // 写作台：立在 -X 书墙前的水上，一盏暖台灯。写下的思考会"沉入水中"。
 
@@ -28,8 +29,9 @@ export default function Lectern() {
       </mesh>
       <mesh position={[0.42, 1.2, -0.1]}>
         <latheGeometry args={[SMALL_BULB, 18]} />
-        <meshStandardMaterial color={PALETTE.lampCore} emissive={new THREE.Color(PALETTE.lampWarm)} emissiveIntensity={1.5} roughness={0.5} toneMapped={false} />
+        <meshStandardMaterial color={PALETTE.lampCore} emissive={new THREE.Color(PALETTE.lampWarm)} emissiveIntensity={1.25} roughness={0.5} toneMapped={false} />
       </mesh>
+      <GlowSprite position={[0.42, 1.2, -0.1]} color={PALETTE.lampWarm} scale={0.7} opacity={0.32} />
       <pointLight position={[0.42, 1.2, -0.1]} color={PALETTE.lampWarm} intensity={5} distance={7} decay={2} />
     </group>
   );

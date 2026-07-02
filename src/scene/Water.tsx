@@ -55,6 +55,9 @@ function MirrorSurface() {
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} renderOrder={2}>
       <circleGeometry args={[DOME_R, 96]} />
+      {/* 材质哲学：金属 1 + 暗蓝黑 albedo = "黑镜"——场景光的 specular 被 albedo 染暗
+          （白爆的月光柱变成克制的淡蓝月路，暖点光只留暗金光潭），画面主体交给 RT 镜像；
+          opacity 0.5 让水下镜像星空透出来（星海底衬），envMapIntensity 压到 0.2 防 IBL 暖罩。 */}
       <MeshReflectorMaterial
         resolution={1024}
         blur={[80, 24]}
@@ -65,11 +68,12 @@ function MirrorSurface() {
         depthScale={0.6}
         minDepthThreshold={0.5}
         maxDepthThreshold={1.4}
-        color="#020409"
-        roughness={0.38}
-        metalness={0}
+        color="#1a2233"
+        roughness={0.5}
+        metalness={1}
+        envMapIntensity={0.2}
         transparent
-        opacity={0.62}
+        opacity={0.5}
         depthWrite={false}
         fog={false}
       />
