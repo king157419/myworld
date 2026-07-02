@@ -13,6 +13,8 @@
 //   ±X = 两侧回廊：-X 书墙（思考），+X 浮岛陈列（物件）。中央＝镜面广场。
 // ─────────────────────────────────────────────────────────────────────────
 
+import type { ZoneType } from "./config/types";
+
 export type Vec3 = [number, number, number];
 
 export const PALETTE = {
@@ -76,23 +78,24 @@ export const COURT_CENTER: Vec3 = [0, 0, -0.5];
 export const GRAMOPHONE: Vec3 = [0, DECK_Y, -9.4];
 
 // 功能区锚点（相机聚焦 + 准心热点）。position = 看向的中心，ry = 正面朝向。
-// 三个核心区沿用同一套数据契约（id/type 不变），只是被重新"皮肤化"到潮汐图书馆：
+// ⚠ 按 zone **type** 索引，不按 id：id 属于用户数据（导入的世界可以改名），
+//   锚点描述的是舞台几何（bookshelf 皮肤长在哪），跟着 type 走。id→type 由 world.zones 解析。
 //   bookshelf → -X 整面书墙 + 写作台（思考/文字）
 //   objects   → +X 浮在水上的发光陈列岛（珍视的物件）
 //   record    → 观星台上的留声机（影音）
-export const ZONE_ANCHORS = {
-  "zone-bookshelf": { position: [-6.4, 2.05, -0.5] as Vec3, ry: Math.PI / 2 }, // -X 书墙，正面朝 +X（court）
-  "zone-objects": { position: [6.3, 1.15, 0.4] as Vec3, ry: -Math.PI / 2 }, // +X 浮岛
-  "zone-record": { position: [0, DECK_Y + 0.95, -9.0] as Vec3, ry: 0 }, // 观星台留声机，朝 +Z 望向镜面
-} as const;
+export const ZONE_ANCHORS: Record<ZoneType, { position: Vec3; ry: number }> = {
+  bookshelf: { position: [-6.4, 2.05, -0.5], ry: Math.PI / 2 }, // -X 书墙，正面朝 +X（court）
+  objects: { position: [6.3, 1.15, 0.4], ry: -Math.PI / 2 }, // +X 浮岛
+  record: { position: [0, DECK_Y + 0.95, -9.0], ry: 0 }, // 观星台留声机，朝 +Z 望向镜面
+};
 
 // 聚焦取景：每个功能区的「主体」包围球（中心 + 半径）。PlayerControls 据此用 fov 反算
 // 取景距离恰好框住主体，并从玩家当前所在的一侧切入（least-disorienting）——不再以"点击命中
-// 点"为中心（命中点落在不可见碰撞盒上、随机飘忽，是之前聚焦像在乱看的根因）。
-export const FOCUS: Record<string, { center: Vec3; radius: number }> = {
-  "zone-record": { center: [0, 2.02, -9.4], radius: 1.05 }, // 留声机本体（含喇叭）
-  "zone-bookshelf": { center: [-6.0, 1.95, -0.3], radius: 2.5 }, // -X 书墙一段
-  "zone-objects": { center: [5.2, 1.05, 0.0], radius: 2.3 }, // +X 浮岛群
+// 点"为中心（命中点落在不可见碰撞盒上、随机飘忽，是之前聚焦像在乱看的根因）。同样按 type 索引。
+export const FOCUS: Record<ZoneType, { center: Vec3; radius: number }> = {
+  record: { center: [0, 2.02, -9.4], radius: 1.05 }, // 留声机本体（含喇叭）
+  bookshelf: { center: [-6.0, 1.95, -0.3], radius: 2.5 }, // -X 书墙一段
+  objects: { center: [5.2, 1.05, 0.0], radius: 2.3 }, // +X 浮岛群
 };
 
 // 书墙（思考）：沿 -X 一段圆弧排布的高书架。角度区间（绕 Y，0=+X 方向，逆时针）。

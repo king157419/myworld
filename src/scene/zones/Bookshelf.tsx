@@ -57,7 +57,7 @@ export default function Bookshelf({ zone }: { zone: Zone }) {
   const glowGroupRef = useRef<THREE.Group>(null);
 
   const spines = useGlowSpines(thoughts.length);
-  const anchor = ZONE_ANCHORS["zone-bookshelf"];
+  const anchor = ZONE_ANCHORS.bookshelf;
 
   // instanced mesh callback：挂载时写矩阵与颜色
   const meshCb = useMemo(() => (mesh: THREE.InstancedMesh | null) => {
