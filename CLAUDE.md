@@ -26,10 +26,13 @@
 ## 当前实现的骨架（潮汐图书馆）
 
 - 唯一几何真相源：`src/theme.ts` 的 LAYOUT（`R_COURT` 镜面广场 / `DECK`+`STEPS` 观星台坡道 / `PEDESTALS` 浮岛 / `BOOKWALL` 书墙弧 / `GRAMOPHONE` / `tideOffset`；`ZONE_ANCHORS`/`FOCUS` 按 **zone type** 索引——id 属于用户数据，可改名）。
-- 场景：`scene/Sky`（星空穹顶+银河+星点+月，水下镜像副本＝"星海倒影"）、`scene/Water`（菲涅尔玻璃水面 shader + `scene/ripples` 脚步涟漪叠加）、
-  `scene/gallery/`（八件陈设一件一文件：灯笼/书墙/观星台/写作台/浮岛/漂浮书/听歌角/留声机 GLB；共用件在 `profiles.ts` 车削轮廓与 `materials.ts` 单例材质；随机一律种子化 `scene/rng.ts`）、
-  `scene/Lighting`（冷月主光+暖补光+Environment；消费 mood：雾/环境光/暖灯）、`scene/Atmosphere`（薄雾+微尘+偶发落水；消费 mood：雾色浓淡 + 雨夜远雷）、`scene/SunkenThoughts`（思绪光点，双 InstancedMesh + 单 useFrame）。
-- 导航/相机：`scene/PlayerControls`（帧循环五态编排）+ `scene/input.ts`（DOM 输入接线）+ `scene/cameraDirector.ts`（聚焦取景/指数阻尼，纯函数有单测）+ `scene/audioListener.ts`（听者同步，位姿未变跳过）+ `scene/walk.ts`（纯函数碰撞：广场∪坡道∪观星台并集，连续线性坡）。`walk.test.ts`/`cameraDirector.test.ts` 单测。
+- 场景：`scene/Sky`（星空穹顶+银河+星点+月+地平线辉光带，水下镜像副本＝"星海倒影"底衬）、
+  `scene/Water`（高配 MeshReflectorMaterial 真平面反射——"黑镜"配方 metal 1+暗 albedo+fog=false；低配菲涅尔玻璃水零 RT；+ `scene/ripples` 脚步涟漪叠加）、
+  `scene/Vista`（远景层：群岛剪影 InstancedMesh + 呼吸灯塔 + 漂流水灯——纯背景，不进碰撞/契约/theme）、`scene/Starfall`（广场中心星光柱，假体积弦长 shader，雨夜熄灭）、
+  `scene/gallery/`（八件陈设一件一文件：灯笼/书墙/观星台/写作台/浮岛/漂浮书/听歌角/留声机 GLB；共用件在 `profiles.ts` 车削轮廓、`materials.ts` 单例材质、`glow.tsx` 渐变光晕 Sprite；随机一律种子化 `scene/rng.ts`）、
+  `scene/Lighting`（冷月主光+暖补光+Environment；消费 mood：雾/环境光/暖灯）、`scene/Atmosphere`（薄雾+微尘+偶发落水+Starfall；消费 mood：雾色浓淡 + 雨夜远雷）、`scene/SunkenThoughts`（思绪光点：核心 InstancedMesh + 晕圈点精灵，单 useFrame，renderOrder 4 透水发光）。
+- 导航/相机：`scene/PlayerControls`（帧循环五态编排；漫游有惯性/步伐包络/FOV 随速微张）+ `scene/input.ts`（DOM 输入接线）+ `scene/cameraDirector.ts`（聚焦取景/指数阻尼/避障方位选择 `computeFocusPoseClear`，纯函数有单测）+ `scene/audioListener.ts`（听者同步，位姿未变跳过）+ `scene/walk.ts`（纯函数碰撞：广场∪坡道∪观星台并集 + 台上道具圆柱碰撞，连续线性坡）。`walk.test.ts`/`cameraDirector.test.ts` 单测。
+- DEV 验证：`localStorage.lj_quality="high"|"low"` 钉死画质（自动化页签 rAF 节流会让 PerformanceMonitor 误判降级，不钉死验不到高画质路径）；DevBridge 暴露 `__lj`/`__ljStore`/`__ljAudio`。
 - 数据/持久化（**沿用，未改契约**）：`store/useWorld`、`config/types`(联合类型由 const 数组派生，io 校验同源)、`config/moods.ts`(心境→氛围唯一真相源)、`data/io`(校验往返)、`data/db`(IndexedDB)、`data/seed`(首次种子)。
 - 数据驱动渲染：`scene/zones/*`（书脊由思考点亮、物件按 primitive/color 生成、唱片机转碟绑 `useAudio.musicPlaying`）。
 - 音频：`audio/engine.ts`（水声独立起播；曲库压缩字节常驻、PCM 按需解码只留当前+下一首；坏轨自动跳；远雷合成）+ `audio/useAudio`（UI 镜像，换曲以引擎回调为准）。

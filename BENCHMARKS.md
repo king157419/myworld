@@ -399,3 +399,94 @@ rb.setNextKinematicTranslation(pos.add(ctrl.computedMovement()));
 | **Rapier KCC / 浮空胶囊**（autostep 上台阶、动态物件碰撞、Bruno 级丝滑） | W6 | 中 | 仅当 games_fps 版手感/动态碰撞不够时升级。 |
 
 **总路径建议：** 先走第一批 1→2→3→4 拿到"统一暖氛围 + 落地 + 顺滑移动 + 居中聚焦"的可玩骨架（已大幅缓解 W2/W3/W4/W5/W6/W7），再按第二批补灯具/喇叭/水面细节，最后视效果决定是否上第三批的烘焙与 raymarching。
+
+---
+
+# 第十轮追加 · 内化台账（2026-07-01）
+
+> 六域并行研究（相机手感/物品精致度/镜面水完整回收；体积光/远景/标杆挖掘三域因进程中断部分回收）。
+> 本节记录：这一轮**实际内化落地**的技法 → 出处/许可；以及研究员给出但**留给下一轮**的高价值配方。
+
+## 已内化（本轮落地，代码在案）
+
+| 技法 | 落地处 | 出处 / 许可 |
+|---|---|---|
+| 真平面反射水（MeshReflectorMaterial）+ 保留几何镜像星空做底衬的"三明治"结构 | `scene/Water.tsx` 高配路径；研究员独立推荐同构方案（Susurrus 案例实证低清反射可行） | drei MIT；Codrops Susurrus 文章为思路参考 |
+| "黑镜"材质配方：metal 1 + 暗 albedo 染黑 specular，反射交给 RT | `Water.tsx`（本轮页内实验收敛出的参数,已注释成文） | 自研参数 |
+| 帧率无关指数阻尼统一相机缓动（1-exp(-λ·dt)） | 第八轮已内化,本轮扩展到速度惯性/步伐包络/FOV | rorydriscoll.com 思路参考 |
+| 非对称加减速时间常数（起步慢/停步快）+ 速度驱动微动效 | `PlayerControls.tsx` ACCEL_RATE 9 / DECEL_RATE 12 | Bruno Simon portfolio case study 思路参考 |
+| FOV kick 克制剂量（满速 +2.6°,阻尼过渡） | `PlayerControls.tsx` FOV_RUN | zigurous 文档思路参考,自行实现 |
+| 位置式 head bob（绝不转 pitch,横移做肩部平移不做 roll） | `PlayerControls.tsx` bob/sway | 生物力学文献口径的公开思路 |
+| 假体积光柱：开口圆台 + |dot(N,V)| 弦长近似 + 上下淡出,BackSide 防双面叠加 | `scene/Starfall.tsx` | 论坛常见技法,自研 shader |
+| 径向渐变 Sprite 光晕替代加色球（无多边形轮廓穿帮） | `scene/gallery/glow.tsx`,灯笼/台灯/光点晕圈/灯塔共用 | 自研,CanvasTexture 程序生成 |
+| 远景剪影 + 场景雾 = 免费大气透视;实例化群岛 1 draw | `scene/Vista.tsx` | 通用环境美术手法 |
+| 倒角显精致（RoundedBox/轮廓圆角) + "一件物品 ≥3 部件" + 微故事簇（墨水瓶/待读书堆） | BookWall/Lectern 既有+本轮扩展 | drei/three MIT;Level Design Book 方法论 |
+| 黑胶高金属低粗糙——靠掠射沟纹反光被认出,哑黑侧看=黑洞 | `zones/RecordPlayer.tsx` + GLB mat23 | 自研参数 |
+
+## 研究员给出、本轮未落（下一轮候选,按 ROI 排序）
+
+1. **涟漪 → distortionMap 管线**（水研究员）：把脚步涟漪渲进 FBO 喂 MeshReflectorMaterial 的 distortionMap——倒影被真实打碎,而不是只画光环。drei MIT,自研 FBO 代码。
+2. **共享程序噪声图 = roughnessMap+bumpMap 的"旧物感"**（物件研究员）：一张 256px fBm 图喂全部手搓件,高光碎化,零资产近零开销。
+3. **MeshPhysicalMaterial 三件套**：clearcoat(漆木/陶瓷)、sheen(布面书)、anisotropy(黄铜喇叭)。three MIT。
+4. **2:1 Lissajous head bob + 波谷落脚事件直连涟漪**（相机研究员）："脚落下的瞬间星海泛起涟漪+相机微沉"——与核心幻觉锁相。
+5. **Henry Heffernan 关键帧相机 + 不对称贝塞尔**（聚焦运镜"快起慢收",repo MIT 已核实 LICENSE）。
+6. **three.js examples 水法线贴图**（MIT,可打包）做月光 glint 微扰,不弯折倒影。
+
+## 第十轮标杆清单(三路并行挖掘 → 汇总去重,2026-07-01)
+
+### Equinox – A WebGL Space Adventure(Little Workshop,Awwwards SOTD + Developer Award 2024-05,FWA SOTM)
+- 链接:https://equinox.space
+- 好在哪:第一人称叙事探索的标杆:氛围靠『漆黑宇宙外景 vs 暖色舱内光』的照明强对比 + 随剧情演进的配乐/旁白节奏推进,而不是堆特效;交互按移动端单指模式整体重设计;概念/建模/WebGL/配乐全部 in-house,像一部可走动的短片,靠 pacing(节奏)而非画质取胜。
+- 可内化 → 轴:①为沉浸而设计的第一人称相机与极简输入(视线引导、缓动转头)→ 相机丝滑;②内暖外冷的照明脚本化对比 → 渲染美。可内化做法:给回廊内/水面外定义两套色温脚本,过门时插值。
+- 开源/拆解:闭源,仅观感参照(制作说明见 https://www.littleworkshop.fr/projects/equinox/)
+
+### Igloo Inc(Abeto,Awwwards Site of the Year 2024)
+- 链接:https://www.igloo.inc
+- 好在哪:冰体为『容器内程序化晶体生长』算法 + raymarching 折射;Houdini VDB 体积数据走自研导出器+压缩,最终体积比一张普通网页图还小;UI 全部在 WebGL 内渲染,文字 scramble 用 SDF 纹理偏移做、不触发 DOM 重排;KTX2 压缩纹理 + requestIdle 加载,重画面下桌面/移动 LCP≈1s。
+- 可内化 → 轴:①体积数据离线烘焙+自定义压缩格式(VDB→浏览器友好格式)→ 渲染美,且天然满足『资产可打包/离线』约束;②SDF 文本与 shader 化 UI 细节 → 物件精致度。
+- 开源/拆解:站点闭源,但有官方逐点技术拆解:https://www.awwwards.com/igloo-inc-case-study.html 与 https://www.webgpu.com/showcase/igloo-inc-procedural-crystals/
+
+### Messenger(Vicente Lucendo + Michael Sungaila / Abeto 发行,Awwwards SOTD 2025)
+- 链接:https://messenger.abeto.co/
+- 好在哪:小行星世界按『展开的立方体』建模再球化,失真最小、便于手工摆件;全世界颜色取样自一张 16x16 色卡图集,换一张 16x16 小图即可整世界瞬间换气氛;水面有岸线涟漪+深度渐变,角色下水衣物染色;越肩相机自动跟随+专调碰撞防窄巷穿插;自研『保轮廓 LOD』远处减面不跳变;首包约 5.7MB、全量 17.5MB(KTX2+Draco)。
+- 可内化 → 轴:①16x16 色卡图集全局调色:一张微型纹理驱动全场景氛围(可做潮汐/时段变化)→ 渲染美;②保轮廓 LOD + 相机碰撞调参 → 世界广阔感/相机丝滑。
+- 开源/拆解:游戏闭源,官方技术拆解:https://www.awwwards.com/messenger.html;其碰撞方案 three-mesh-bvh 开源(MIT):https://github.com/gkjohnson/three-mesh-bvh
+
+### Gen-02 / Samsy 的沉浸式世界(Samuel Honigstein,Awwwards SOTD + Developer Award 2025-10)
+- 链接:https://samsy.ninja/
+- 好在哪:自写 WebGPU 渲染管线;开场是四面环水的小岛+樱花树,靠水面反射把场景边界变成『倒影里的无限』,再用实例化花瓣粒子铺满空气层——小体量场景做出大氛围的教科书。注:形式是作品集,但结构是『可行走的内心世界』而非 3D 简历模板。
+- 可内化 → 轴:①环水小岛构图:让水承担『世界边界→无限延伸』的错觉 → 世界广阔感(与潮汐图书馆镜面水思路同源,可对照它的倒影/雾衔接处理);②instancing + data texture 驱动大规模粒子 → 渲染美。
+- 开源/拆解:闭源,仅观感参照(作者在 Medium 有 instanced rendering / data textures 技术长文,X:@Samsyyyy)
+
+### Summer Afternoon(Vicente Lucendo,three.js forum showcase 高赞 + Awwwards SOTD)
+- 链接:https://summer-afternoon.vlucendo.com/
+- 好在哪:黄昏暖色『手绘渐变光』小世界的原型级作品:松弛感来自低对比渐变配色 + 自研全景实时阴影;角色物理/碰撞/跟随相机全部手写(碰撞用 three-mesh-bvh 加速);自定义几何导出器 + 纹理/着色器初始与后台双阶段加载,首屏极快。
+- 可内化 → 轴:①手写跟随相机+角色物理:缓动、超调、回弹参数全部自己掌控(不是 OrbitControls 改装)→ 相机丝滑;②渐变主导的 stylized 光色 → 渲染美。
+- 开源/拆解:闭源;官方 case study:https://www.awwwards.com/summer-afternoon.html;论坛帖:https://discourse.threejs.org/t/summer-afternoon/46963
+
+### Elysium(thebenezer,three.js forum showcase 高赞,被社区称『年度最佳』)
+- 链接:https://elysium.thebenezer.com/
+- 好在哪:独立开发 6 个月的 stylized 开放小世界:godrays、按高度/距离渐变的 gradient fog(不是单色 FogExp2)、带深度差泡沫的风格化水、星空、随风摆动且对玩家位置有反应的草;vanilla three.js + 手写 GLSL + three-mesh-bvh,证明夜景大气全靠 shader 分层不靠资产堆量。
+- 可内化 → 轴:①『渐变雾 + godrays + 星空』三层夜空大气叠法:正好是把已有的远景群岛、星光柱『缝合成一个世界』的胶水 → 世界广阔感;②深度差泡沫水岸线 → 渲染美(回帖中有现成的水深 shader 片段可抄)。
+- 开源/拆解:闭源;技法讨论与水体 shader 片段见论坛帖:https://discourse.threejs.org/t/elysium-the-most-beautiful-stylized-world-on-the-web/55541
+
+### Alfi's Adventures(Ctrlmonster,three.js forum showcase)
+- 链接:https://create.viverse.com/EcxNxwe
+- 好在哪:全自定义球谐(SH)PRT 烘焙光照:静态场景一身『烘焙质感』,动态角色仍能接入同一套光而不违和;全程零后处理——bloom 用叠加在物体上的透明自发光壳网格伪造,大气散射用『随视线方向变化的雾』伪造;渲染+模拟整体跑在 WebWorker/OffscreenCanvas。
+- 可内化 → 轴:①SH 光探针烘焙:让可交互物件融入烘焙场景 → 渲染美 + 物件精致度;②免后处理的伪 bloom / 视向雾:低成本、离线打包与低端机友好 → 渲染美。作者给出的原理文献本身就是教程。
+- 开源/拆解:闭源;论坛帖:https://discourse.threejs.org/t/alfis-adventures-three-js-game/85754;作者引用的可学习文献:https://iquilezles.org/articles/fog/ 与 https://patapom.com/blog/SHPortal/
+
+### My Room in 3D(Bruno Simon,three.js forum showcase 高赞,repo 4.4k star)
+- 链接:https://my-room-in-3d.vercel.app/
+- 好在哪:『夜晚暖灯房间』的教科书实现:Blender 烘焙昼/夜两套贴图,shader 内以 uNightMix/uNeutralMix 插值切换;另用一张 lightmap 的 R/G/B 三通道分别充当电视/台灯/PC 灯的遮罩,uLightTvStrength、uLightDeskStrength、uLightPcStrength 等 uniform 独立调每盏灯的强度与色温——同时获得烘焙质感与可调灯光,运行时零实时光源开销。
+- 可内化 → 轴:RGB 通道分灯 lightmap 混合:一对一命中『暖灯读书回廊』——每盏读书灯独立呼吸/调色而帧成本为零 → 物件精致度 + 渲染美,完全离线可打包。
+- 开源/拆解:源码公开:https://github.com/brunosimon/my-room-in-3d(注意仓库未附 LICENSE,做法可学、代码资产不可直接搬运);论坛帖:https://discourse.threejs.org/t/my-room-in-3d-using-three-js/30732
+
+### Edelweiss(felixmariotto,three.js forum showcase 三页热帖)
+- 链接:https://felixmariotto.itch.io/edelweiss
+- 好在哪:完整开源的 3D 解谜平台游戏:自写引擎 + 配套地图编辑器(Edelweiss-Editor),手绘风天空/云雾/塔楼场景;从资产组织、碰撞系统到关卡管线全链路代码可读。视觉不及前面几件,但它是本批唯一『代码+资产全套可拆』的作品。
+- 可内化 → 轴:CC0 许可意味着代码与资产都可直接打包进离线项目;其『自建轻量场景编辑器』思路可复用为回廊物件摆放/烘焙管线 → 物件精致度。
+- 开源/拆解:开源:https://github.com/felixmariotto/Edelweiss(许可 CC0-1.0);论坛帖:https://discourse.threejs.org/t/open-source-3d-platformer-edelweiss/12847
+
+**最值得先内化的两件事(下一轮首选):**
+① My Room in 3D 的『昼夜烘焙插值 + RGB 通道分灯 lightmap』(uNightMix + 每盏灯独立 strength/色温 uniform):与『暖灯读书回廊立在夜水上』一对一命中——烘焙一次,每盏读书灯可独立呼吸、调色而运行时零光源成本,离线打包无障碍、源码公开可逐行读,是四轴里同时抬升『渲染美+物件精致度』且落地成本最低的一件。② Elysium 的夜景大气三层叠(高度/距离渐变雾 + godrays + 星空 + 风场植被):项目已有远景群岛剪影和星光柱,眼下最缺的正是把它们缝合成同一个世界的『空气层』——渐变雾决定远景消隐的层次,godrays 给灯塔/星光柱加体积感,直接决定『世界广阔感』这条最难的轴;且论坛帖内有现成水深/雾 shader 片段可参照,纯 shader 方案不增加资产体积。
