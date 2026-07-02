@@ -25,13 +25,16 @@
 
 ## 当前实现的骨架（潮汐图书馆）
 
-- 唯一几何真相源：`src/theme.ts` 的 LAYOUT（`R_COURT` 镜面广场 / `DECK`+`STEPS` 观星台木梯 / `PEDESTALS` 浮岛 / `BOOKWALL` 书墙弧 / `tideOffset`）。
-- 场景：`scene/Sky`（星空穹顶+银河+星点+月）、`scene/Water`（MeshReflectorMaterial 镜面 + `scene/ripples` 脚步涟漪叠加）、
-  `scene/Gallery`（书墙/灯笼/观星台/写作台/浮岛/烛环/漂浮书/留声机）、`scene/Lighting`（冷月主光+暖补光+Environment）、`scene/Atmosphere`（薄雾+微尘+偶发落水）。
-- 导航/碰撞：`scene/PlayerControls` + `scene/walk.ts`（广场∪木梯∪观星台并集；支撑高度按当前 y 区分水面/观星台；浮岛/写作台圆柱碰撞）。`scene/walk.test.ts` 单测。
-- 数据/持久化（**沿用，未改契约**）：`store/useWorld`、`config/types`(`SavedWorld`)、`data/io`(校验往返)、`data/db`(IndexedDB)、`data/seed`(首次种子)。
-- 数据驱动渲染：`scene/zones/*`（书脊由思考点亮、物件按 primitive/color 生成、音轨列表）——**本轮重构中，需按新几何接回**。
-- 后处理：`scene/PostFX`（AgX + Bloom + DOF + 暗角 + 轻颗粒）。
+- 唯一几何真相源：`src/theme.ts` 的 LAYOUT（`R_COURT` 镜面广场 / `DECK`+`STEPS` 观星台坡道 / `PEDESTALS` 浮岛 / `BOOKWALL` 书墙弧 / `GRAMOPHONE` / `tideOffset`；`ZONE_ANCHORS`/`FOCUS` 按 **zone type** 索引——id 属于用户数据，可改名）。
+- 场景：`scene/Sky`（星空穹顶+银河+星点+月，水下镜像副本＝"星海倒影"）、`scene/Water`（菲涅尔玻璃水面 shader + `scene/ripples` 脚步涟漪叠加）、
+  `scene/gallery/`（八件陈设一件一文件：灯笼/书墙/观星台/写作台/浮岛/漂浮书/听歌角/留声机 GLB；共用件在 `profiles.ts` 车削轮廓与 `materials.ts` 单例材质；随机一律种子化 `scene/rng.ts`）、
+  `scene/Lighting`（冷月主光+暖补光+Environment；消费 mood：雾/环境光/暖灯）、`scene/Atmosphere`（薄雾+微尘+偶发落水；消费 mood：雾色浓淡 + 雨夜远雷）、`scene/SunkenThoughts`（思绪光点，双 InstancedMesh + 单 useFrame）。
+- 导航/相机：`scene/PlayerControls`（帧循环五态编排）+ `scene/input.ts`（DOM 输入接线）+ `scene/cameraDirector.ts`（聚焦取景/指数阻尼，纯函数有单测）+ `scene/audioListener.ts`（听者同步，位姿未变跳过）+ `scene/walk.ts`（纯函数碰撞：广场∪坡道∪观星台并集，连续线性坡）。`walk.test.ts`/`cameraDirector.test.ts` 单测。
+- 数据/持久化（**沿用，未改契约**）：`store/useWorld`、`config/types`(联合类型由 const 数组派生，io 校验同源)、`config/moods.ts`(心境→氛围唯一真相源)、`data/io`(校验往返)、`data/db`(IndexedDB)、`data/seed`(首次种子)。
+- 数据驱动渲染：`scene/zones/*`（书脊由思考点亮、物件按 primitive/color 生成、唱片机转碟绑 `useAudio.musicPlaying`）。
+- 音频：`audio/engine.ts`（水声独立起播；曲库压缩字节常驻、PCM 按需解码只留当前+下一首；坏轨自动跳；远雷合成）+ `audio/useAudio`（UI 镜像，换曲以引擎回调为准）。
+- UI：`ui/Hud`（纯编排）+ `EnterOverlay`/`Reticle`/`DockControls`；三面板共用 `ui/useEntryForm` 表单生命周期。
+- 后处理：`scene/PostFX`（SMAA + Bloom + 色彩分级 + AgX + 暗角 + 轻颗粒；无 DOF——第一人称走动里太贵）。
 
 ## 开发
 
