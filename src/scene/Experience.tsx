@@ -35,9 +35,23 @@ function DevBridge() {
   return null;
 }
 
+// 仅开发期：钉死画质档，绕过探测与 PerformanceMonitor。
+// 自动化验证页签（Playwright/隐藏页）的 rAF 被节流成 ~1fps，PerformanceMonitor 必然误判掉帧
+// 把画质切低——不钉死就永远验不到高画质路径（反射水面等）。
+function qualityPin(): "low" | "high" | null {
+  try {
+    if (!import.meta.env.DEV) return null;
+    const v = localStorage.getItem("lj_quality");
+    if (v === "low" || v === "high") return v;
+    if (localStorage.getItem("lj_forceLow") === "1") return "low"; // 兼容旧开关
+  } catch { /* ignore */ }
+  return null;
+}
+
 // 低端探测：粗略按 CPU 核数 / 内存 / 移动端起步降级；运行时再由 PerformanceMonitor 收紧。
 function probeLowEnd(): boolean {
-  try { if (import.meta.env.DEV && localStorage.getItem("lj_forceLow") === "1") return true; } catch { /* ignore */ }
+  const pin = qualityPin();
+  if (pin) return pin === "low";
   if (typeof navigator === "undefined") return false;
   const cores = navigator.hardwareConcurrency ?? 8;
   const mem = (navigator as unknown as { deviceMemory?: number }).deviceMemory ?? 8;
@@ -69,6 +83,7 @@ export default function Experience() {
       {/* 掉帧时：降 dpr + 切到低画质（关反射地板 / 关景深 / 关 MSAA / 缩小阴影）。回升只提 dpr，不反复切画质避免抖动。 */}
       <PerformanceMonitor
         onDecline={() => {
+          if (qualityPin() === "high") return; // 钉死高画质时不降级（仅 DEV）
           setDpr(1);
           setLow(true);
         }}
@@ -78,7 +93,7 @@ export default function Experience() {
         <Sky />
         <Lighting low={low} />
         <Gallery />
-        <Water />
+        <Water low={low} />
         <Atmosphere />
         <SunkenThoughts />
         <Zones />

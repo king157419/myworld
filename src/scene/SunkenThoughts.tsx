@@ -177,13 +177,15 @@ export default function SunkenThoughts() {
 
   return (
     <group name="sunken-thoughts">
-      {/* 核心亮点（实例化） */}
-      <instancedMesh ref={coreRef} args={[undefined, undefined, MAX_MOTES]} frustumCulled={false}>
+      {/* 核心亮点（实例化）。renderOrder=4：在水面(2)/涟漪(3)之后画——反射水面比旧玻璃水
+          不透明得多，光点若按深度序先画会被水面盖到只剩 15%；后画 = "荧光透水而出"。
+          水面不写深度，此处仍做深度测试 → 不会鬼影穿透观星台/书墙等实体。 */}
+      <instancedMesh ref={coreRef} args={[undefined, undefined, MAX_MOTES]} frustumCulled={false} renderOrder={4}>
         <sphereGeometry args={[CORE_R, 8, 6]} />
         <meshBasicMaterial transparent depthWrite={false} toneMapped={false} blending={THREE.AdditiveBlending} />
       </instancedMesh>
       {/* 柔光晕圈（实例化） */}
-      <instancedMesh ref={haloRef} args={[undefined, undefined, MAX_MOTES]} frustumCulled={false}>
+      <instancedMesh ref={haloRef} args={[undefined, undefined, MAX_MOTES]} frustumCulled={false} renderOrder={4}>
         <meshBasicMaterial transparent depthWrite={false} toneMapped={false} blending={THREE.AdditiveBlending} />
         <sphereGeometry args={[HALO_R, 8, 6]} />
       </instancedMesh>
