@@ -12,7 +12,7 @@
 //   · clamp 改为"最近可行走区"（不再在走出台子边缘时径向投影回水圈 → 那是"空气墙向后瞬移"的根因）。
 //   · 加 MAX_STEP_UP 门限：从侧面撞上比脚高很多的坡壁会被挡住（像墙），不再"瞬移上去"。
 // ─────────────────────────────────────────────────────────────────────────
-import { DECK, DECK_Y, LECTERN, PEDESTALS, R_COURT, STEPS } from "../theme";
+import { DECK, DECK_Y, GRAMOPHONE, LECTERN, PEDESTALS, R_COURT, STEPS } from "../theme";
 
 const RADIUS = 0.32; // 玩家身体半径
 const MAX_STEP_UP = 0.42; // 单帧最多抬升（> 一级踏步，≪ 多级；> 走坡每帧抬升，故正常上坡不受阻）
@@ -51,10 +51,15 @@ export function supportHeight(x: number, z: number, currentY: number): number {
   return Math.max(0, currentY);
 }
 
-// 水上浮岛 + 写作台：圆柱碰撞（cx, cz, r）。
+// 水上浮岛 + 写作台 + 观星台道具：圆柱碰撞（cx, cz, r）。
+// 台上道具（留声机/听歌角台灯/望远镜）此前没有碰撞体——一路 W 能从留声机模型正中穿过去，
+// 相机进到喇叭腔里看背面剔除的黑色碎片（审计 F2 实拍）。英雄物件必须是实体。
 const COLLIDERS: [number, number, number][] = [
   ...PEDESTALS.map((p) => [p.pos[0], p.pos[2], p.r] as [number, number, number]),
   [LECTERN[0], LECTERN[2], 0.5],
+  [GRAMOPHONE[0], GRAMOPHONE[2], 0.62], // 留声机（含底座）
+  [GRAMOPHONE[0] - 1.4, GRAMOPHONE[2], 0.3], // 听歌角台灯
+  [DECK.x1 - 1.0, DECK.zFar + 0.9, 0.42], // 望远镜
 ];
 
 // 沿障碍滑行（slide），而非径向弹出。把本帧位移分解为"指向圆心(法向)"与"切向"两部分，

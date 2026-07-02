@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
-import { computeFocusPose, dampPose } from "./cameraDirector";
+import { computeFocusPose, computeFocusPoseClear, dampPose } from "./cameraDirector";
 
 // 相机导演纯几何的回归锚：
 // · 取景距离 = max(r/sin(vFov/2), r/sin(hFov/2)) · 1.3（恰好框住包围球再留白）
@@ -64,6 +64,47 @@ describe("computeFocusPose", () => {
 
     const dir = pos.clone().sub(center).normalize();
     expect(dir.y).toBeLessThanOrEqual(0.55 + 1e-6);
+  });
+});
+
+describe("computeFocusPoseClear（避障取景）", () => {
+  it("首选方位畅通时与 computeFocusPose 完全一致", () => {
+    const cam = makeCam(3, 1.6, 2);
+    const center = new THREE.Vector3(-6.0, 1.95, -0.3);
+    const posA = new THREE.Vector3(), qA = new THREE.Quaternion();
+    const posB = new THREE.Vector3(), qB = new THREE.Quaternion();
+    computeFocusPose(cam, center, 2.5, posA, qA);
+    computeFocusPoseClear(cam, center, 2.5, () => true, posB, qB);
+    expect(posB.distanceTo(posA)).toBeLessThan(1e-9);
+    expect(Math.abs(qB.dot(qA))).toBeGreaterThan(1 - 1e-9);
+  });
+
+  it("首选被挡时绕到最近的畅通方位，且仍正对球心、距离不变", () => {
+    const cam = makeCam(0, 1.6, 6.6);
+    const center = new THREE.Vector3(0, 2.02, -9.4);
+    const radius = 1.05;
+    const pos0 = new THREE.Vector3(), q0 = new THREE.Quaternion();
+    computeFocusPose(cam, center, radius, pos0, q0);
+    // 判定器：拒绝一切与首选机位太近的候选（模拟"玩家侧有灯杆"）
+    const pos = new THREE.Vector3(), q = new THREE.Quaternion();
+    computeFocusPoseClear(cam, center, radius, (p) => p.distanceTo(pos0) > 0.5, pos, q);
+
+    expect(pos.distanceTo(pos0)).toBeGreaterThan(0.5); // 真的换了方位
+    expect(pos.distanceTo(center)).toBeCloseTo(pos0.distanceTo(center), 5); // 距离守恒
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(q);
+    const toCenter = center.clone().sub(pos).normalize();
+    expect(forward.dot(toCenter)).toBeGreaterThan(0.9999); // 仍正对球心
+    expect(pos.y).toBeCloseTo(pos0.y, 5); // 只绕水平方位，俯仰不变
+  });
+
+  it("全部方位被挡时退回玩家侧（不会死循环/未定义）", () => {
+    const cam = makeCam(0, 1.6, 6.6);
+    const center = new THREE.Vector3(0, 2.02, -9.4);
+    const pos0 = new THREE.Vector3(), q0 = new THREE.Quaternion();
+    computeFocusPose(cam, center, 1.05, pos0, q0);
+    const pos = new THREE.Vector3(), q = new THREE.Quaternion();
+    computeFocusPoseClear(cam, center, 1.05, () => false, pos, q);
+    expect(pos.distanceTo(pos0)).toBeLessThan(1e-9);
   });
 });
 
