@@ -34,6 +34,9 @@ const domeFrag = /* glsl */ `
   void main(){
     float h = clamp(vDir.y*0.5+0.5, 0.0, 1.0);
     vec3 col = mix(uHorizon, uZenith, smoothstep(0.04, 0.62, h));
+    // 地平线辉光带：贴地一窄条更亮的冷蓝——远景群岛的剪影靠它衬出来（大气透视的"亮背景"）
+    float hg = exp(-max(vDir.y, 0.0) * 10.0) * smoothstep(-0.12, 0.0, vDir.y);
+    col += uHorizon * hg * 0.9;
     // 银河：一条柔和、有絮状层次、自然融进星场的乳白光河（不是蓝色硬光束）
     vec3 bandN = normalize(vec3(0.42, 0.5, -0.72));
     float band = 1.0 - abs(dot(normalize(vDir), bandN));

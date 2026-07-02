@@ -4,6 +4,7 @@ import { PerformanceMonitor } from "@react-three/drei";
 import * as THREE from "three";
 import Lighting from "./Lighting";
 import Sky from "./Sky";
+import Vista from "./Vista";
 import Water from "./Water";
 import Gallery from "./gallery";
 import Atmosphere from "./Atmosphere";
@@ -91,6 +92,7 @@ export default function Experience() {
       />
       <Suspense fallback={null}>
         <Sky />
+        <Vista />
         <Lighting low={low} />
         <Gallery />
         <Water low={low} />
