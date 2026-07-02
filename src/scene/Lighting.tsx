@@ -2,18 +2,28 @@ import { useMemo } from "react";
 import * as THREE from "three";
 import { Environment, Lightformer } from "@react-three/drei";
 import { DECK_Y, GRAMOPHONE, PALETTE } from "../theme";
+import { useWorld } from "../store/useWorld";
+import { MOOD_PRESETS } from "../config/moods";
 
 // 夜的光：冷的月作主光（唯一投影），暖的灯由 Gallery 的 pointLight / 自发光球承担。
 // 背景交给 Sky 的星空穹顶（不设纯色背景）；近水雾由 Atmosphere 处理。
-// IBL 用 drei Environment 内联 Lightformer 现烤——不下载任何 HDRI，离线可跑，
-// 给黄铜 / 留声机喇叭一点冷暖相间的高光。
+// IBL 用 drei Environment 内联 Lightformer 现烤——不下载任何 HDRI，离线可跑。
+//
+// 心境（world.room.mood）在此消费：场景雾密度/色、环境光色温、暖补光强度按 MOOD_PRESETS 调制。
+// 月光与 IBL 保持恒定（它们是场景的锚，逐 mood 重烤 IBL 会卡顿）。
 export default function Lighting({ low = false }: { low?: boolean }) {
+  const mood = useWorld((s) => s.world.room.mood.lighting);
+  const preset = MOOD_PRESETS[mood] ?? MOOD_PRESETS.cool;
   const moonPos = useMemo(() => new THREE.Vector3(-0.5, 0.18, -1).normalize().multiplyScalar(42), []);
   const shadow = low ? 1024 : 2048;
   return (
-    <group>
-      <ambientLight intensity={0.32} color={"#5a6ea0"} />
-      <hemisphereLight args={["#2c3f72", "#0a0d16", 0.92]} />
+    <>
+      {/* 场景雾：attach 到 scene（Lighting 的 JSX 父级）——只吃标准材质（回廊木/铜/石），
+          天空与水是自定义 shader 不受雾影响，星海始终清澈 */}
+      <fogExp2 attach="fog" args={[preset.fogColor, preset.fogDensity]} />
+      <group>
+      <ambientLight intensity={0.32 * preset.ambientMul} color={preset.ambientColor} />
+      <hemisphereLight args={["#2c3f72", "#0a0d16", preset.hemiIntensity]} />
       <directionalLight
         position={moonPos.toArray()}
         intensity={0.95}
@@ -31,11 +41,10 @@ export default function Lighting({ low = false }: { low?: boolean }) {
         shadow-normalBias={0.02}
       />
       {/* 观星台暖色补光：给台子和留声机一点存在感与停留的暖意（锚在 GRAMOPHONE 邻域，挪留声机时跟着走） */}
-      <pointLight position={[GRAMOPHONE[0], DECK_Y + 1.3, GRAMOPHONE[2] + 0.2]} color={PALETTE.lampWarm} intensity={4.5} distance={9} decay={2} />
+      <pointLight position={[GRAMOPHONE[0], DECK_Y + 1.3, GRAMOPHONE[2] + 0.2]} color={PALETTE.lampWarm} intensity={4.5 * preset.lampMul} distance={9} decay={2} />
       {/* 广场低位暖溢光：贴着水面抬一点暗部，但不投影、范围克制 */}
-      <pointLight position={[0, 0.8, 1.5]} color={"#ffca82"} intensity={1.6} distance={9} decay={2} />
-      {/* 更厚的 IBL：黄铜/金属现在能反射到"暖灯池 + 冷天 + 暖地"，不再是死黑；
-          ring 形给喇叭一道可信的圆弧高光。仍是程序化、离线、贴本作冷暖调。 */}
+      <pointLight position={[0, 0.8, 1.5]} color={"#ffca82"} intensity={1.6 * preset.lampMul} distance={9} decay={2} />
+      {/* 更厚的 IBL：黄铜/金属反射"暖灯池 + 冷天 + 暖地"，不死黑；ring 形给喇叭一道可信的圆弧高光。 */}
       <Environment resolution={low ? 96 : 256} frames={1}>
         {/* 冷天穹（顶） */}
         <Lightformer intensity={0.55} color={"#26396a"} position={[0, 10, 0]} scale={[30, 30, 1]} target={[0, 0, 0]} />
@@ -48,6 +57,7 @@ export default function Lighting({ low = false }: { low?: boolean }) {
         {/* 暖地反射（水面把暖意反上来，金属底面不死黑） */}
         <Lightformer intensity={0.35} color={"#3a2a18"} position={[0, -2, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[26, 26, 1]} />
       </Environment>
-    </group>
+      </group>
+    </>
   );
 }

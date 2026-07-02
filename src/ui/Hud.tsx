@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import type { Mood } from "../config/types";
+import { MOOD_ORDER, MOOD_PRESETS } from "../config/moods";
 import { useWorld } from "../store/useWorld";
 import { useAudio } from "../audio/useAudio";
 import { persistNow } from "../data/db";
@@ -9,12 +9,8 @@ import ObjectForm from "./ObjectForm";
 import RecordPanel from "./RecordPanel";
 import RecentPanel from "./RecentPanel";
 
-const MOODS: { value: Mood; label: string; fog: number }[] = [
-  { value: "rainy",   label: "雨", fog: 0.32 },
-  { value: "warm",    label: "暖", fog: 0.20 },
-  { value: "cool",    label: "冷", fog: 0.28 },
-  { value: "neutral", label: "中", fog: 0.18 },
-];
+// 心境表单源在 config/moods.ts（Lighting/Atmosphere 消费同一份，按钮不再是视觉空操作）。
+const MOODS = MOOD_ORDER.map((value) => ({ value, label: MOOD_PRESETS[value].label, fog: MOOD_PRESETS[value].fog }));
 
 export default function Hud() {
   const entered        = useWorld((s) => s.entered);

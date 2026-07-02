@@ -1,10 +1,14 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { R_COURT } from "../theme";
 import { spawnRipple } from "./ripples";
+import { useWorld } from "../store/useWorld";
+import { MOOD_PRESETS } from "../config/moods";
+import { audioEngine } from "../audio/engine";
 
-// 氛围：贴着水面缓缓漂移的薄雾 + 空气里悬浮的微尘/萤火。给镜面之上一层呼吸感与纵深。
+// 氛围：贴着水面缓缓漂移的薄雾 + 空气里悬浮的微尘/萤火 + （雨夜）偶发远雷。
+// 心境在此消费：薄雾颜色/浓度按 MOOD_PRESETS 调制，rainy 档启用远雷。
 
 const mistVert = /* glsl */ `
   varying vec2 vWorld;
@@ -18,6 +22,7 @@ const mistFrag = /* glsl */ `
   precision highp float;
   varying vec2 vWorld;
   uniform float uTime;
+  uniform float uStrength;
   uniform vec3 uColor;
   float hash(vec2 p){ return fract(sin(dot(p, vec2(41.3,289.1)))*43758.5); }
   float noise(vec2 p){
@@ -31,19 +36,34 @@ const mistFrag = /* glsl */ `
     m = smoothstep(0.5, 1.0, m);
     float r = length(vWorld);
     float ring = smoothstep(1.5, 6.0, r) * smoothstep(13.0, 7.0, r); // 极薄、贴身、不延伸到地平线（避免切开天水）
-    float a = m * ring * 0.1;
+    float a = m * ring * 0.1 * uStrength;
     gl_FragColor = vec4(uColor, a);
   }
 `;
 
-function Mist() {
-  const mat = useRef<THREE.ShaderMaterial>(null);
+function Mist({ color, strength }: { color: string; strength: number }) {
+  const layers = useRef<(THREE.ShaderMaterial | null)[]>([null, null]);
+  // 两层共用同一个 uTime 引用（显式共享，一次驱动两层）；颜色/浓度各自独立可调。
+  const uTime = useMemo(() => ({ value: 0 }), []);
   const uniforms = useMemo(
-    () => ({ uTime: { value: 0 }, uColor: { value: new THREE.Color("#9fb6d8") } }),
-    [],
+    () => [
+      { uTime, uStrength: { value: 1 }, uColor: { value: new THREE.Color("#9fb6d8") } },
+      { uTime, uStrength: { value: 1 }, uColor: { value: new THREE.Color("#8aa0c8") } },
+    ],
+    [uTime],
   );
+
+  // 心境切换：调色/调浓，不重建材质
+  useEffect(() => {
+    const base = new THREE.Color(color);
+    uniforms[0].uColor.value.copy(base);
+    uniforms[1].uColor.value.copy(base).multiplyScalar(0.88);
+    uniforms[0].uStrength.value = strength;
+    uniforms[1].uStrength.value = strength;
+  }, [color, strength, uniforms]);
+
   useFrame((s) => {
-    if (mat.current) (mat.current.uniforms.uTime as { value: number }).value = s.clock.elapsedTime;
+    uTime.value = s.clock.elapsedTime;
   });
   return (
     <group>
@@ -51,10 +71,10 @@ function Mist() {
         <mesh key={i} rotation={[-Math.PI / 2, 0, 0]} position={[0, y, 0]} frustumCulled={false} renderOrder={3}>
           <planeGeometry args={[58, 58]} />
           <shaderMaterial
-            ref={i === 0 ? mat : undefined}
+            ref={(m) => { layers.current[i] = m; }}
             vertexShader={mistVert}
             fragmentShader={mistFrag}
-            uniforms={i === 0 ? uniforms : { uTime: uniforms.uTime, uColor: { value: new THREE.Color("#8aa0c8") } }}
+            uniforms={uniforms[i]}
             transparent
             depthWrite={false}
             blending={THREE.AdditiveBlending}
@@ -121,11 +141,35 @@ function Motes() {
   return <points ref={ref} geometry={geom} material={mat} frustumCulled={false} />;
 }
 
+/** 雨夜远雷：8~40 秒随机间隔的低频轰鸣（engine.thunder 合成，无外部文件）。 */
+function DistantThunder() {
+  useEffect(() => {
+    let alive = true;
+    let id: ReturnType<typeof setTimeout>;
+    const schedule = (delay: number) => {
+      id = setTimeout(() => {
+        if (!alive) return;
+        audioEngine.thunder(0.35 + Math.random() * 0.5);
+        schedule(16000 + Math.random() * 24000);
+      }, delay);
+    };
+    schedule(8000 + Math.random() * 10000);
+    return () => {
+      alive = false;
+      clearTimeout(id);
+    };
+  }, []);
+  return null;
+}
+
 export default function Atmosphere() {
+  const mood = useWorld((s) => s.world.room.mood.lighting);
+  const preset = MOOD_PRESETS[mood] ?? MOOD_PRESETS.cool;
   return (
     <group>
-      <Mist />
+      <Mist color={preset.mistColor} strength={preset.mistMul} />
       <Motes />
+      {preset.thunder && <DistantThunder />}
     </group>
   );
 }

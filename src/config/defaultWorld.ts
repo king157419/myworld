@@ -1,5 +1,6 @@
 import type { WorldConfig } from "./types";
 import { PALETTE, ZONE_ANCHORS } from "../theme";
+import { MOOD_PRESETS } from "./moods";
 
 // 首次进入时的初始世界。一切都从这里读——它本身就是一份最小的"保存的数据"。
 // 注意：用固定时间戳让"默认世界"确定性；用户写入内容(Entry)时才产生真正的时间戳。
@@ -22,8 +23,8 @@ export const defaultWorld: WorldConfig = {
       accent: PALETTE.brass,
       floor: PALETTE.waterTint,
     },
-    // 主基调：冷夜镜面水 + 暖灯回廊。
-    mood: { lighting: "cool", intensity: 1, fog: 0.18 },
+    // 主基调：冷夜镜面水 + 暖灯回廊。fog 与 UI/场景同源（config/moods.ts），不再各存一份。
+    mood: { lighting: "cool", intensity: 1, fog: MOOD_PRESETS.cool.fog },
   },
   zones: [
     {

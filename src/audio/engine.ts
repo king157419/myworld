@@ -278,7 +278,7 @@ export class AudioEngine {
   next(): void { void this.playFrom(this.currentIndex + 1); }
   prev(): void { void this.playFrom(this.currentIndex - 1 + TRACKS.length); }
 
-  // ── 远雷（天气层在闪电后延迟调用） ────────────────────────────────────
+  // ── 远雷（雨夜心境下由 Atmosphere.DistantThunder 随机间隔调用） ───────
 
   /** 远雷：合成噪声脉冲，无需外部文件。 */
   thunder(intensity = 1): void {
