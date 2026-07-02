@@ -1,18 +1,26 @@
-import { useEffect, useState } from "react";
-import { useWorld } from "../store/useWorld";
 import { useAudio } from "../audio/useAudio";
-import { useZoneEntries } from "./useZoneEntries";
+import { useEntryForm } from "./useEntryForm";
 import EntryList from "./EntryList";
+
+interface TrackDraft {
+  title: string;
+  body: string;
+}
 
 // 黑胶角面板：唱机放的是一套离线打包的公有领域 / CC0 钢琴夜曲（空间化在留声机位、走近变响、
 // 放完自动接下一首，可点选切换）——播放/暂停/切换在此。下面"听歌记忆"是你自己收藏的曲子。
+// 表单生命周期在 useEntryForm。
 export default function RecordPanel({ zoneId }: { zoneId: string }) {
-  const selectedEntryId = useWorld((s) => s.selectedEntryId);
-  const addEntry = useWorld((s) => s.addEntry);
-  const updateEntry = useWorld((s) => s.updateEntry);
-  const deleteEntry = useWorld((s) => s.deleteEntry);
-  const selectEntry = useWorld((s) => s.selectEntry);
-  const tracks = useZoneEntries(zoneId, "track");
+  const { items: tracks, draft, setDraft, editingId, save, reset, remove, selectEntry } = useEntryForm<TrackDraft>({
+    zoneId,
+    type: "track",
+    empty: { title: "", body: "" },
+    fromEntry: (e) => ({ title: e.title, body: e.body }),
+    toPatch: (d) => {
+      const title = d.title.trim();
+      return title ? { title, body: d.body.trim() } : null;
+    },
+  });
 
   const musicPlaying = useAudio((s) => s.musicPlaying);
   const toggleMusic = useAudio((s) => s.toggleMusic);
@@ -22,35 +30,6 @@ export default function RecordPanel({ zoneId }: { zoneId: string }) {
   const nextTrack = useAudio((s) => s.nextTrack);
   const prevTrack = useAudio((s) => s.prevTrack);
   const now = repertoire[currentTrack];
-
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!selectedEntryId) return;
-    const t = tracks.find((e) => e.id === selectedEntryId);
-    if (t) {
-      setTitle(t.title);
-      setBody(t.body);
-      setEditingId(t.id);
-    }
-  }, [selectedEntryId, tracks]);
-
-  const reset = () => {
-    setTitle("");
-    setBody("");
-    setEditingId(null);
-    selectEntry(null);
-  };
-
-  const save = () => {
-    const t = title.trim();
-    if (!t) return;
-    if (editingId) updateEntry(editingId, { title: t, body: body.trim() });
-    else addEntry({ zoneId, type: "track", title: t, body: body.trim() });
-    reset();
-  };
 
   return (
     <div className="panel">
@@ -83,6 +62,7 @@ export default function RecordPanel({ zoneId }: { zoneId: string }) {
               key={t.id}
               className={`list-item${i === currentTrack ? " active" : ""}`}
               onClick={() => playTrack(i)}
+              aria-pressed={i === currentTrack}
             >
               <span className="title">
                 {i === currentTrack && musicPlaying ? "♪ " : ""}{t.title}
@@ -98,28 +78,33 @@ export default function RecordPanel({ zoneId }: { zoneId: string }) {
 
         <label className="field">
           <span>歌名 / 曲目</span>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="凌晨四点的萨克斯" />
+          <input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="凌晨四点的萨克斯" />
         </label>
         <label className="field">
           <span>它让你想起</span>
-          <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={3} placeholder="在哪听到、和谁、那天的天气……" />
+          <textarea value={draft.body} onChange={(e) => setDraft({ ...draft, body: e.target.value })} rows={3} placeholder="在哪听到、和谁、那天的天气……" />
         </label>
 
         <div className="row">
-          <button className="primary" onClick={save} disabled={!title.trim()}>
+          <button className="primary" onClick={save} disabled={!draft.title.trim()}>
             {editingId ? "保存修改" : "收进唱片架"}
           </button>
           {editingId && (
             <>
               <button className="secondary" onClick={reset}>记新的一首</button>
-              <button className="danger" onClick={() => { deleteEntry(editingId); reset(); }}>移除</button>
+              <button className="danger" onClick={remove}>移除</button>
             </>
           )}
         </div>
 
         <EntryList headLabel="听歌记忆" count={tracks.length} emptyText="还没有收藏的曲子。">
           {tracks.map((t) => (
-            <button key={t.id} className={`list-item${t.id === editingId ? " active" : ""}`} onClick={() => selectEntry(t.id)}>
+            <button
+              key={t.id}
+              className={`list-item${t.id === editingId ? " active" : ""}`}
+              onClick={() => selectEntry(t.id)}
+              aria-pressed={t.id === editingId}
+            >
               <span className="title">{t.title}</span>
               <span className="date">{new Date(t.createdAt).toLocaleDateString("zh-CN")}</span>
             </button>

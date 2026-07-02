@@ -1,61 +1,36 @@
-import { useEffect, useState } from "react";
 import type { Primitive } from "../config/types";
-import { useWorld } from "../store/useWorld";
-import { useZoneEntries } from "./useZoneEntries";
+import { PRIMITIVES } from "../config/types";
+import { useEntryForm } from "./useEntryForm";
 import EntryList from "./EntryList";
 
-const PRIMS: { value: Primitive; label: string }[] = [
-  { value: "box", label: "方" },
-  { value: "cylinder", label: "柱" },
-  { value: "sphere", label: "球" },
-];
+const PRIM_LABELS: Record<Primitive, string> = { box: "方", cylinder: "柱", sphere: "球" };
+const DEFAULT_COLOR = "#caa472";
+
+interface ObjectDraft {
+  title: string;
+  body: string;
+  primitive: Primitive;
+  color: string;
+}
 
 // 物件博物馆面板：添加物件（标题 + 描述 + 几何体 + 颜色）→ 基座上出现它，可旋转端详。
+// 表单生命周期在 useEntryForm。
 export default function ObjectForm({ zoneId }: { zoneId: string }) {
-  const selectedEntryId = useWorld((s) => s.selectedEntryId);
-  const addEntry = useWorld((s) => s.addEntry);
-  const updateEntry = useWorld((s) => s.updateEntry);
-  const deleteEntry = useWorld((s) => s.deleteEntry);
-  const selectEntry = useWorld((s) => s.selectEntry);
-  const objects = useZoneEntries(zoneId, "object");
-
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [primitive, setPrimitive] = useState<Primitive>("box");
-  const [color, setColor] = useState("#caa472");
-  const [editingId, setEditingId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!selectedEntryId) return;
-    const o = objects.find((e) => e.id === selectedEntryId);
-    if (o) {
-      setTitle(o.title);
-      setBody(o.body);
-      setPrimitive(o.primitive ?? "box");
-      setColor(o.color ?? "#caa472");
-      setEditingId(o.id);
-    }
-  }, [selectedEntryId, objects]);
-
-  const reset = () => {
-    setTitle("");
-    setBody("");
-    setPrimitive("box");
-    setColor("#caa472");
-    setEditingId(null);
-    selectEntry(null);
-  };
-
-  const save = () => {
-    const t = title.trim();
-    if (!t) return;
-    if (editingId) {
-      updateEntry(editingId, { title: t, body: body.trim(), primitive, color });
-    } else {
-      addEntry({ zoneId, type: "object", title: t, body: body.trim(), primitive, color });
-    }
-    reset();
-  };
+  const { items: objects, draft, setDraft, editingId, save, reset, remove, selectEntry } = useEntryForm<ObjectDraft>({
+    zoneId,
+    type: "object",
+    empty: { title: "", body: "", primitive: "box", color: DEFAULT_COLOR },
+    fromEntry: (e) => ({
+      title: e.title,
+      body: e.body,
+      primitive: e.primitive ?? "box",
+      color: e.color ?? DEFAULT_COLOR,
+    }),
+    toPatch: (d) => {
+      const title = d.title.trim();
+      return title ? { title, body: d.body.trim(), primitive: d.primitive, color: d.color } : null;
+    },
+  });
 
   return (
     <div className="panel">
@@ -69,45 +44,37 @@ export default function ObjectForm({ zoneId }: { zoneId: string }) {
 
         <label className="field">
           <span>标题</span>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="那副陪了三年的耳机" />
+          <input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="那副陪了三年的耳机" />
         </label>
         <label className="field">
           <span>来历</span>
-          <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={3} placeholder="它从哪来，为什么在乎它……" />
+          <textarea value={draft.body} onChange={(e) => setDraft({ ...draft, body: e.target.value })} rows={3} placeholder="它从哪来，为什么在乎它……" />
         </label>
         <div className="field">
           <span id="prim-label">形状</span>
           <div className="row" role="group" aria-labelledby="prim-label">
-            {PRIMS.map((p) => (
+            {PRIMITIVES.map((p) => (
               <button
-                key={p.value}
-                className={`chip${primitive === p.value ? " active" : ""}`}
-                aria-pressed={primitive === p.value}
-                onClick={() => setPrimitive(p.value)}
+                key={p}
+                className={`chip${draft.primitive === p ? " active" : ""}`}
+                aria-pressed={draft.primitive === p}
+                onClick={() => setDraft({ ...draft, primitive: p })}
               >
-                {p.label}
+                {PRIM_LABELS[p]}
               </button>
             ))}
-            <input type="color" value={color} onChange={(e) => setColor(e.target.value)} aria-label="颜色" />
+            <input type="color" value={draft.color} onChange={(e) => setDraft({ ...draft, color: e.target.value })} aria-label="颜色" />
           </div>
         </div>
 
         <div className="row">
-          <button className="primary" onClick={save} disabled={!title.trim()}>
+          <button className="primary" onClick={save} disabled={!draft.title.trim()}>
             {editingId ? "保存修改" : "放上基座"}
           </button>
           {editingId && (
             <>
               <button className="secondary" onClick={reset}>添加新的</button>
-              <button
-                className="danger"
-                onClick={() => {
-                  deleteEntry(editingId);
-                  reset();
-                }}
-              >
-                移除
-              </button>
+              <button className="danger" onClick={remove}>移除</button>
             </>
           )}
         </div>
@@ -118,6 +85,7 @@ export default function ObjectForm({ zoneId }: { zoneId: string }) {
               key={o.id}
               className={`list-item${o.id === editingId ? " active" : ""}`}
               onClick={() => selectEntry(o.id)}
+              aria-pressed={o.id === editingId}
             >
               <span className="title">{o.title}</span>
               <span className="date">{new Date(o.createdAt).toLocaleDateString("zh-CN")}</span>
