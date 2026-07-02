@@ -28,7 +28,7 @@ const REMAT: Record<string, Spec> = {
   mat22: { color: "#5a5e66", metalness: 0.65, roughness: 0.52 }, // 暗金属件
   mat20: { color: PALETTE.woodWarm, metalness: 0.08, roughness: 0.62 }, // 木箱
   mat17: { color: "#140f0b", metalness: 0.2, roughness: 0.72 }, // 暗部 / 箱底
-  mat23: { color: "#0a0a0d", metalness: 0.28, roughness: 0.4 }, // 黑胶唱片
+  mat23: { color: "#101014", metalness: 0.6, roughness: 0.18 }, // 黑胶唱片：高金属低粗糙，掠射灯光的沟纹反光才认得出是胶（哑黑=侧看黑洞）
   mat8: { color: "#b07a3a", metalness: 0.1, roughness: 0.55 }, // 唱片标（原刺红→暖琥珀）
   mat14: { color: "#c79152", metalness: 0.1, roughness: 0.55 }, // 唱片标 2
 };

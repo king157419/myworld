@@ -33,6 +33,30 @@ export default function Lectern() {
       </mesh>
       <GlowSprite position={[0.42, 1.2, -0.1]} color={PALETTE.lampWarm} scale={0.7} opacity={0.32} />
       <pointLight position={[0.42, 1.2, -0.1]} color={PALETTE.lampWarm} intensity={5} distance={7} decay={2} />
+
+      {/* 有人住过的痕迹：墨水瓶 + 台脚边一小摞还没放回去的书 */}
+      <group position={[-0.28, 1.14, -0.16]}>
+        <mesh castShadow>
+          <cylinderGeometry args={[0.035, 0.045, 0.07, 10]} />
+          <meshStandardMaterial color={"#1a2030"} roughness={0.25} metalness={0.1} />
+        </mesh>
+        <mesh position={[0, 0.05, 0]} material={brassMat}>
+          <cylinderGeometry args={[0.014, 0.014, 0.03, 8]} />
+        </mesh>
+      </group>
+      {[0, 1, 2].map((i) => (
+        <RoundedBox
+          key={i}
+          args={[0.24 - i * 0.03, 0.045, 0.17]}
+          radius={0.008}
+          smoothness={2}
+          position={[0.34 + (i % 2) * 0.02, 0.023 + i * 0.045, 0.38 - (i % 2) * 0.03]}
+          rotation={[0, 0.3 + i * 0.35, 0]}
+          castShadow
+        >
+          <meshStandardMaterial color={["#7a4a3a", "#3a4a5c", "#6b5a34"][i]} roughness={0.85} />
+        </RoundedBox>
+      ))}
     </group>
   );
 }

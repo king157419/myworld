@@ -34,12 +34,35 @@ export default function BookWall() {
       for (let lvl = 0; lvl < BOOKWALL.shelves; lvl++) {
         const y = 0.5 + lvl * (BOOKWALL.height / BOOKWALL.shelves);
         sh.push({ p: new THREE.Vector3(x, y, z), ry, w: segW * 0.94 });
-        // 这一格里排一串书：宽窄/高矮/进深各异，偶有歪斜、偶有被抽出半截，颜色做旧——绝不雷同。
+        // 这一格里排一串书：宽窄/高矮/进深各异，偶有歪斜、偶有被抽出半截、偶有平摞的两三本
+        // （读过还没放回去的样子），颜色做旧——绝不雷同。
         const inward = new THREE.Vector3(-x, 0, -z).normalize(); // 朝圆心（书架正面）方向
         const count = 11;
         let cursor = -segW * 0.46;
         const aged = new THREE.Color("#2e2620");
+        const pickColor = () => new THREE.Color(BOOK_COLORS[Math.floor(rand() * BOOK_COLORS.length)]).lerp(aged, 0.22 + rand() * 0.18);
         for (let b = 0; b < count && cursor < segW * 0.46; b++) {
+          // 平摞：~9% 的位置躺两三本（占一本半的宽度），书堆微错位
+          if (rand() < 0.09) {
+            const pileW = 0.2 + rand() * 0.06; // 躺着的书長边沿架
+            cursor += pileW * 0.55;
+            const along = cursor;
+            const pileN = 2 + (rand() < 0.4 ? 1 : 0);
+            let py = y + 0.04;
+            for (let p = 0; p < pileN; p++) {
+              const th = 0.035 + rand() * 0.02; // 书厚
+              const jitter = (rand() - 0.5) * 0.04;
+              const bx = x + Math.cos(ry) * (along + jitter);
+              const bz = z + Math.sin(ry) * (along + jitter);
+              const m = new THREE.Matrix4();
+              const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, ry + (rand() - 0.5) * 0.18, 0));
+              m.compose(new THREE.Vector3(bx, py + th / 2, bz), q, new THREE.Vector3(pileW, th, 0.15 + rand() * 0.05));
+              inst.push({ m, c: pickColor() });
+              py += th;
+            }
+            cursor += pileW * 0.6;
+            continue;
+          }
           const w = 0.07 + rand() * 0.06;
           cursor += w * 0.62;
           const along = cursor;
@@ -52,8 +75,7 @@ export default function BookWall() {
           const m = new THREE.Matrix4();
           const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, ry, tilt));
           m.compose(new THREE.Vector3(bx, y + h / 2 + 0.04, bz), q, new THREE.Vector3(w, h, depth));
-          const c = new THREE.Color(BOOK_COLORS[Math.floor(rand() * BOOK_COLORS.length)]).lerp(aged, 0.22 + rand() * 0.18);
-          inst.push({ m, c });
+          inst.push({ m, c: pickColor() });
           cursor += w * 0.62;
         }
       }
@@ -89,6 +111,16 @@ export default function BookWall() {
         />
         <meshStandardMaterial color={"#1c130c"} roughness={0.92} metalness={0.02} side={THREE.DoubleSide} />
       </mesh>
+      {/* 弧两端的封板：从观星台侧望过来曾是敞开的截面——隔板悬空、书浮在星上（审计 P2）*/}
+      {[BOOKWALL.a0, BOOKWALL.a1].map((a, i) => {
+        const ex = Math.cos(a) * (BOOKWALL.radius + 0.05);
+        const ez = Math.sin(a) * (BOOKWALL.radius + 0.05);
+        return (
+          <mesh key={`cap${i}`} position={[ex, BOOKWALL.height / 2, ez]} rotation={[0, a + Math.PI / 2, 0]} castShadow material={woodWarmMat}>
+            <boxGeometry args={[0.08, BOOKWALL.height + 0.2, 0.62]} />
+          </mesh>
+        );
+      })}
       {shelves.map((s, i) => (
         <RoundedBox key={`s${i}`} args={[s.w, 0.05, 0.56]} radius={0.012} smoothness={2} position={s.p} rotation={[0, s.ry, 0]} material={woodMat} />
       ))}

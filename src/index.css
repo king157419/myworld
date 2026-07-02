@@ -105,11 +105,12 @@ body {
   pointer-events: auto;
 }
 .enter-overlay {
-  /* 径向暗角从左上角投来，不对称 */
+  /* 左实右虚：文字侧压暗保可读，右侧放世界透出来——入场页背后是缓缓环绕的回廊，
+     纯黑底把它全遮死是浪费第一印象（审计 P5）*/
   background:
-    radial-gradient(ellipse 80% 100% at 20% 40%, #181310 0%, transparent 70%),
-    radial-gradient(ellipse 120% 80% at 80% 80%, #05070a 0%, transparent 60%),
-    #0a0806;
+    radial-gradient(ellipse 80% 100% at 20% 40%, rgba(24, 19, 16, 0.9) 0%, transparent 70%),
+    radial-gradient(ellipse 120% 80% at 80% 80%, rgba(5, 7, 10, 0.45) 0%, transparent 60%),
+    linear-gradient(100deg, rgba(10, 8, 6, 0.95) 0%, rgba(10, 8, 6, 0.78) 42%, rgba(6, 7, 12, 0.14) 100%);
 }
 
 /* 题词页主体：左对齐，书脊偏移 */
@@ -727,7 +728,7 @@ button.danger:hover:not(:disabled) {
 /* chip / 形状选择器 — 文字 toggle，无填色 */
 button.chip {
   font-family: var(--mech);
-  font-size: 0.7rem;
+  font-size: 0.74rem;
   letter-spacing: 0.1em;
   color: var(--ink-3);
   padding: 2px 0;
@@ -887,12 +888,12 @@ button.icon:hover { color: var(--ink); }
   flex: none;
 }
 
-/* 控制项文字 */
+/* 控制项文字。0.68rem/ink-4 在实机截图里挤成一行灰蚊——抬一档字号与对比（审计 H2） */
 .ctl {
   font-family: var(--mech);
-  font-size: 0.68rem;
+  font-size: 0.74rem;
   letter-spacing: 0.08em;
-  color: var(--ink-4);
+  color: var(--ink-3);
   padding: 0;
   border: none;
   background: none;

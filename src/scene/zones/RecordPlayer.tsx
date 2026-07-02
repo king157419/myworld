@@ -38,10 +38,11 @@ export default function RecordPlayer({ zone }: { zone: Zone }) {
       position={GRAMOPHONE}
       onClick={(e) => { e.stopPropagation(); focusZone(zone.id); }}
     >
-      {/* 旋转黑胶唱片（盖住模型静态唱片，转起来就是"在放"）*/}
+      {/* 旋转黑胶唱片（盖住模型静态唱片，转起来就是"在放"）。
+          高金属低粗糙：黑胶要靠掠射的灯光沟纹反光被认出来——纯黑哑面从侧面看是"喇叭上的黑洞"（审计遗留）*/}
       <mesh ref={disc} position={[0, discY, 0]} castShadow>
         <cylinderGeometry args={[0.18, 0.18, 0.016, 48]} />
-        <meshStandardMaterial color={"#0a0a0d"} roughness={0.3} metalness={0.24} />
+        <meshStandardMaterial color={"#101014"} roughness={0.18} metalness={0.6} envMapIntensity={1.6} />
       </mesh>
 
       {/* 唱片中心标签（播放时发暖光）*/}

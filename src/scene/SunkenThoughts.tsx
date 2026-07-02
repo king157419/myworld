@@ -4,6 +4,7 @@ import * as THREE from "three";
 import { R_COURT, tidePhase, LECTERN } from "../theme";
 import { useZoneEntries } from "../ui/useZoneEntries";
 import { spawnRipple } from "./ripples";
+import { glowTexture } from "./gallery/glow";
 import type { Entry } from "../config/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -22,8 +23,8 @@ import type { Entry } from "../config/types";
 const MAX_MOTES = 60;
 const SINK_DURATION = 3.5; // 秒：新思考从水面沉到安息位的动画时长
 
-const CORE_R = 0.065;
-const HALO_R = 0.22;
+const CORE_R = 0.055;
+const HALO_SIZE = 0.5; // 晕圈点精灵的世界尺寸（sizeAttenuation）
 
 // 暖金色（"沉在水里的思绪"——在一整片冷色星海里，你的念头是暖的，一眼能认出）
 const CORE_COLOR = new THREE.Color("#ffe0a6").multiplyScalar(1.7);
@@ -96,8 +97,29 @@ export default function SunkenThoughts() {
   const visible = useMemo(() => thoughts.slice(0, MAX_MOTES), [thoughts]);
 
   const coreRef = useRef<THREE.InstancedMesh>(null);
-  const haloRef = useRef<THREE.InstancedMesh>(null);
   const states = useRef<Map<string, MoteState>>(new Map());
+
+  // 晕圈：Points + 径向渐变贴图（一次绘制）。此前是 60 颗半径 0.22 的加色低分球——
+  // 近看是"橙色八边形煎蛋"（审计 P4）；点精灵永远面向相机、边缘按贴图衰减，无轮廓可穿帮。
+  const halo = useMemo(() => {
+    const pos = new Float32Array(MAX_MOTES * 3);
+    const col = new Float32Array(MAX_MOTES * 3);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    g.setDrawRange(0, 0);
+    const m = new THREE.PointsMaterial({
+      map: glowTexture(),
+      size: HALO_SIZE,
+      vertexColors: true,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      sizeAttenuation: true,
+      toneMapped: false,
+    });
+    return { g, m, pos, col };
+  }, []);
 
   // 同步 visible 变化：清理已删除的、更新 entry 引用（新增在帧循环里惰性建，保证首帧即现）。
   useEffect(() => {
@@ -117,8 +139,7 @@ export default function SunkenThoughts() {
 
   useFrame((s) => {
     const core = coreRef.current;
-    const halo = haloRef.current;
-    if (!core || !halo) return;
+    if (!core) return;
     const t = s.clock.elapsedTime;
     const now = Date.now(); // 每帧一次，60 颗共用
     const tideShift = (tidePhase(t) - 0.5) * 0.35;
@@ -157,22 +178,27 @@ export default function SunkenThoughts() {
 
       tmpMat.makeTranslation(curX, curY, curZ);
       core.setMatrixAt(n, tmpMat);
-      halo.setMatrixAt(n, tmpMat);
+      halo.pos[n * 3] = curX;
+      halo.pos[n * 3 + 1] = curY;
+      halo.pos[n * 3 + 2] = curZ;
 
       // 深度 → 亮度：curY ≈ -0.1（高潮浅处）~ -1.6（低潮深处）
       const depthFactor = Math.max(0, Math.min(1, (curY + 1.6) / 1.5));
       const baseAlpha = 0.3 + depthFactor * 0.6; // 0.3 ~ 0.9
       core.setColorAt(n, tmpCol.copy(CORE_COLOR).multiplyScalar(Math.min(1, baseAlpha * 1.1)));
-      halo.setColorAt(n, tmpCol.copy(HALO_COLOR).multiplyScalar(baseAlpha * 0.2));
+      tmpCol.copy(HALO_COLOR).multiplyScalar(baseAlpha * 0.5);
+      halo.col[n * 3] = tmpCol.r;
+      halo.col[n * 3 + 1] = tmpCol.g;
+      halo.col[n * 3 + 2] = tmpCol.b;
       n++;
     }
 
     core.count = n;
-    halo.count = n;
     core.instanceMatrix.needsUpdate = true;
-    halo.instanceMatrix.needsUpdate = true;
     if (core.instanceColor) core.instanceColor.needsUpdate = true;
-    if (halo.instanceColor) halo.instanceColor.needsUpdate = true;
+    halo.g.setDrawRange(0, n);
+    (halo.g.getAttribute("position") as THREE.BufferAttribute).needsUpdate = true;
+    (halo.g.getAttribute("color") as THREE.BufferAttribute).needsUpdate = true;
   });
 
   return (
@@ -181,14 +207,11 @@ export default function SunkenThoughts() {
           不透明得多，光点若按深度序先画会被水面盖到只剩 15%；后画 = "荧光透水而出"。
           水面不写深度，此处仍做深度测试 → 不会鬼影穿透观星台/书墙等实体。 */}
       <instancedMesh ref={coreRef} args={[undefined, undefined, MAX_MOTES]} frustumCulled={false} renderOrder={4}>
-        <sphereGeometry args={[CORE_R, 8, 6]} />
+        <sphereGeometry args={[CORE_R, 12, 9]} />
         <meshBasicMaterial transparent depthWrite={false} toneMapped={false} blending={THREE.AdditiveBlending} />
       </instancedMesh>
-      {/* 柔光晕圈（实例化） */}
-      <instancedMesh ref={haloRef} args={[undefined, undefined, MAX_MOTES]} frustumCulled={false} renderOrder={4}>
-        <meshBasicMaterial transparent depthWrite={false} toneMapped={false} blending={THREE.AdditiveBlending} />
-        <sphereGeometry args={[HALO_R, 8, 6]} />
-      </instancedMesh>
+      {/* 柔光晕圈（点精灵，一次绘制） */}
+      <points geometry={halo.g} material={halo.m} frustumCulled={false} renderOrder={4} />
     </group>
   );
 }
