@@ -6,7 +6,7 @@ import { brassMat, woodMat, woodWarmMat } from "./materials";
 
 // 观星台：从水面升起的石台 + 登台坡道（连续坡，脚下高度与 walk.ts 逐点一致）+ 栏杆 + 望远镜。
 
-export default function Deck() {
+export default function Deck({ baked = false }: { baked?: boolean }) {
   const cx = (DECK.x0 + DECK.x1) / 2;
   const cz = (DECK.zFar + DECK.zNear) / 2;
   const wx = DECK.x1 - DECK.x0;
@@ -50,49 +50,58 @@ export default function Deck() {
 
   return (
     <group>
-      {/* 台体 */}
-      <RoundedBox args={[wx, DECK_Y, wz]} radius={0.04} smoothness={3} position={[cx, DECK_Y / 2, cz]} castShadow receiveShadow>
-        <meshStandardMaterial color={PALETTE.stoneLit} roughness={0.82} metalness={0.06} />
-      </RoundedBox>
+      {/* 静态壳（baked 时由 BakedShell 的分灯 lightmap 版本接管渲染） */}
+      {!baked && (
+        <>
+          {/* 台体 */}
+          <RoundedBox name="deck-platform" userData={{ ljBake: "static" }} args={[wx, DECK_Y, wz]} radius={0.04} smoothness={3} position={[cx, DECK_Y / 2, cz]} castShadow receiveShadow>
+            <meshStandardMaterial color={PALETTE.stoneLit} roughness={0.82} metalness={0.06} />
+          </RoundedBox>
 
-      {/* 登台坡道（楔形）*/}
-      <mesh geometry={ramp} castShadow receiveShadow material={woodWarmMat} />
+          {/* 登台坡道（楔形）*/}
+          <mesh name="deck-ramp" userData={{ ljBake: "static" }} geometry={ramp} castShadow receiveShadow material={woodWarmMat} />
 
-      {/* 踏条：薄木条嵌在坡面上（贴着坡面、随坡倾斜）*/}
-      {nosings.map((p, i) => (
-        <mesh key={i} position={p} rotation={[SLOPE_ANG, 0, 0]} castShadow material={woodMat}>
-          <boxGeometry args={[STEPS.x1 - STEPS.x0 - 0.18, 0.03, 0.13]} />
-        </mesh>
-      ))}
+          {/* 踏条：薄木条嵌在坡面上（贴着坡面、随坡倾斜）*/}
+          {nosings.map((p, i) => (
+            <mesh key={i} name="deck-nosing" userData={{ ljBake: "static" }} position={p} rotation={[SLOPE_ANG, 0, 0]} castShadow material={woodMat}>
+              <boxGeometry args={[STEPS.x1 - STEPS.x0 - 0.18, 0.03, 0.13]} />
+            </mesh>
+          ))}
+        </>
+      )}
 
       {/* 坡脚暖光：坡道入水处一圈窄暖光，"邀请上台" */}
       <pointLight position={[0, 0.16, STEPS.zBottom + 0.05]} color={PALETTE.lampWarm} intensity={1.1} distance={3.2} decay={2} />
       {/* 两侧栏杆（真黄铜，车削立柱） */}
-      {[DECK.x0 + 0.1, DECK.x1 - 0.1].map((rx, i) => (
-        <group key={i}>
-          <mesh position={[rx, DECK_Y + 0.5, cz]} material={brassMat}>
-            <boxGeometry args={[0.06, 0.06, wz - 0.2]} />
-          </mesh>
-          {[cz - wz / 2 + 0.3, cz, cz + wz / 2 - 0.3].map((pz, j) => (
-            <mesh key={j} position={[rx, DECK_Y + 0.26, pz]} castShadow material={brassMat}>
-              <cylinderGeometry args={[0.026, 0.026, 0.52, 12]} />
-            </mesh>
+      {!baked && (
+        <>
+          {[DECK.x0 + 0.1, DECK.x1 - 0.1].map((rx, i) => (
+            <group key={i}>
+              <mesh name="deck-rail" userData={{ ljBake: "static" }} position={[rx, DECK_Y + 0.5, cz]} material={brassMat}>
+                <boxGeometry args={[0.06, 0.06, wz - 0.2]} />
+              </mesh>
+              {[cz - wz / 2 + 0.3, cz, cz + wz / 2 - 0.3].map((pz, j) => (
+                <mesh key={j} name="deck-post" userData={{ ljBake: "static" }} position={[rx, DECK_Y + 0.26, pz]} castShadow material={brassMat}>
+                  <cylinderGeometry args={[0.026, 0.026, 0.52, 12]} />
+                </mesh>
+              ))}
+            </group>
           ))}
-        </group>
-      ))}
-      {/* 望远镜（朝天） */}
-      <group position={[DECK.x1 - 1.0, DECK_Y, DECK.zFar + 0.9]}>
-        <mesh position={[0, 0.5, 0]} material={brassMat}>
-          <cylinderGeometry args={[0.055, 0.07, 1.0, 20]} />
-        </mesh>
-        <mesh position={[0, 0.9, 0.18]} rotation={[0.9, 0, 0]} castShadow>
-          <cylinderGeometry args={[0.085, 0.1, 0.9, 20]} />
-          <meshStandardMaterial color={"#1c2430"} roughness={0.4} metalness={0.7} />
-        </mesh>
-        <mesh position={[0, 0.06, 0]} material={woodMat}>
-          <cylinderGeometry args={[0.18, 0.2, 0.12, 24]} />
-        </mesh>
-      </group>
+          {/* 望远镜（朝天） */}
+          <group position={[DECK.x1 - 1.0, DECK_Y, DECK.zFar + 0.9]}>
+            <mesh name="scope-base" userData={{ ljBake: "static" }} position={[0, 0.5, 0]} material={brassMat}>
+              <cylinderGeometry args={[0.055, 0.07, 1.0, 20]} />
+            </mesh>
+            <mesh name="scope-tube" userData={{ ljBake: "static" }} position={[0, 0.9, 0.18]} rotation={[0.9, 0, 0]} castShadow>
+              <cylinderGeometry args={[0.085, 0.1, 0.9, 20]} />
+              <meshStandardMaterial color={"#1c2430"} roughness={0.4} metalness={0.7} />
+            </mesh>
+            <mesh name="scope-foot" userData={{ ljBake: "static" }} position={[0, 0.06, 0]} material={woodMat}>
+              <cylinderGeometry args={[0.18, 0.2, 0.12, 24]} />
+            </mesh>
+          </group>
+        </>
+      )}
     </group>
   );
 }

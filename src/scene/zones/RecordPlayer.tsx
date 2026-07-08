@@ -56,8 +56,9 @@ export default function RecordPlayer({ zone }: { zone: Zone }) {
         />
       </mesh>
 
-      {/* 播放时在唱盘/喇叭口之间打一束暖光 */}
+      {/* 播放时在唱盘/喇叭口之间打一束暖光（内容灯：随播放态变，烘焙管线跳过） */}
       <pointLight
+        userData={{ ljBake: "content" }}
         position={[0, 0.55, 0.05]}
         color={PALETTE.lampWarm}
         intensity={playing ? 4.0 : 1.0}

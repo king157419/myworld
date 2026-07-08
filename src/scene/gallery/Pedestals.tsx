@@ -6,27 +6,32 @@ import { brassMat } from "./materials";
 
 // 立在水上的发光陈列岛：水面小基座 + 细黄铜柱 + 顶台。物件由 zones/ObjectMuseum 叠在顶台上。
 
-export default function Pedestals() {
+export default function Pedestals({ baked = false }: { baked?: boolean }) {
   return (
     <group>
       {PEDESTALS.map((p, i) => (
         <group key={i} position={[p.pos[0], 0, p.pos[2]]}>
-          <RoundedBox args={[p.r * 1.7, 0.12, p.r * 1.7]} radius={0.05} smoothness={3} position={[0, 0.06, 0]} castShadow receiveShadow>
-            <meshStandardMaterial color={PALETTE.stoneLit} roughness={0.72} metalness={0.1} />
-          </RoundedBox>
-          {/* 车削黄铜柱 */}
-          <mesh position={[0, p.h / 2 + 0.1, 0]} castShadow material={brassMat}>
-            <latheGeometry args={[[V2(0.085, 0), V2(0.06, 0.12), V2(0.055, p.h * 0.55), V2(0.07, p.h * 0.9), V2(0.085, p.h)], 24]} />
-          </mesh>
-          {/* 顶台（倒角圆盘） */}
-          <mesh position={[0, p.h + 0.12, 0]} castShadow receiveShadow>
-            <cylinderGeometry args={[p.r * 0.62, p.r * 0.6, 0.08, 28]} />
-            <meshStandardMaterial color={PALETTE.woodWarm} roughness={0.58} metalness={0.1} />
-          </mesh>
-          {/* 顶台铜沿 */}
-          <mesh position={[0, p.h + 0.16, 0]} material={brassMat}>
-            <torusGeometry args={[p.r * 0.62, 0.012, 10, 32]} />
-          </mesh>
+          {/* 静态壳（baked 时由 BakedShell 接管） */}
+          {!baked && (
+            <>
+              <RoundedBox name="ped-base" userData={{ ljBake: "static" }} args={[p.r * 1.7, 0.12, p.r * 1.7]} radius={0.05} smoothness={3} position={[0, 0.06, 0]} castShadow receiveShadow>
+                <meshStandardMaterial color={PALETTE.stoneLit} roughness={0.72} metalness={0.1} />
+              </RoundedBox>
+              {/* 车削黄铜柱 */}
+              <mesh name="ped-column" userData={{ ljBake: "static" }} position={[0, p.h / 2 + 0.1, 0]} castShadow material={brassMat}>
+                <latheGeometry args={[[V2(0.085, 0), V2(0.06, 0.12), V2(0.055, p.h * 0.55), V2(0.07, p.h * 0.9), V2(0.085, p.h)], 24]} />
+              </mesh>
+              {/* 顶台（倒角圆盘） */}
+              <mesh name="ped-top" userData={{ ljBake: "static" }} position={[0, p.h + 0.12, 0]} castShadow receiveShadow>
+                <cylinderGeometry args={[p.r * 0.62, p.r * 0.6, 0.08, 28]} />
+                <meshStandardMaterial color={PALETTE.woodWarm} roughness={0.58} metalness={0.1} />
+              </mesh>
+              {/* 顶台铜沿 */}
+              <mesh name="ped-rim" userData={{ ljBake: "static" }} position={[0, p.h + 0.16, 0]} material={brassMat}>
+                <torusGeometry args={[p.r * 0.62, 0.012, 10, 32]} />
+              </mesh>
+            </>
+          )}
           {/* 顶台暖光圈：收敛成一道细暖鞘，别再像发光"飞碟环" */}
           <mesh position={[0, p.h + 0.175, 0]}>
             <torusGeometry args={[p.r * 0.5, 0.008, 8, 28]} />

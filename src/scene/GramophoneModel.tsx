@@ -42,6 +42,7 @@ function Model() {
       if (!mesh.isMesh) return;
       mesh.castShadow = true;
       mesh.receiveShadow = true;
+      mesh.userData.ljBake = "occluder"; // 烘焙时挡光/在台面上留接触影，不被烘不被换
       const apply = (mat: THREE.Material): THREE.Material => {
         const std = (mat as THREE.MeshStandardMaterial).clone(); // 克隆，别污染 useGLTF 缓存
         const spec = REMAT[std.name];

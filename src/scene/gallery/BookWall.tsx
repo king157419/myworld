@@ -10,7 +10,7 @@ import { woodMat, woodWarmMat } from "./materials";
 // -X 一段圆弧上的高书架骨架 + 大量装饰书脊（实例化，倒角）。用户思考由 zones/Bookshelf 叠加。
 // 书的宽窄/高矮/歪斜用种子化随机：同一个世界每次进来长一样（可复现、截图可对比）。
 
-export default function BookWall() {
+export default function BookWall({ baked = false }: { baked?: boolean }) {
   const spineGeom = useMemo(() => new RoundedBoxGeometry(1, 1, 1, 2, 0.085), []);
   const { uprights, shelves, instances } = useMemo(() => {
     const rand = seededRng(7311);
@@ -97,34 +97,39 @@ export default function BookWall() {
   return (
     <group>
       {uprights.map((u, i) => (
-        <RoundedBox key={`u${i}`} args={[0.1, BOOKWALL.height, 0.46]} radius={0.018} smoothness={3} position={u.p} rotation={[0, u.ry, 0]} castShadow material={woodWarmMat}>
+        <RoundedBox key={`u${i}`} name="wall-upright" userData={{ ljBake: "occluder" }} args={[0.1, BOOKWALL.height, 0.46]} radius={0.018} smoothness={3} position={u.p} rotation={[0, u.ry, 0]} castShadow material={woodWarmMat}>
           {/* 框上一道极淡的暖金边：像灯光擦过木头的棱线，瞬间高级 */}
           <Edges threshold={18} scale={1.0}>
             <lineBasicMaterial color={PALETTE.brass} transparent opacity={0.16} toneMapped={false} />
           </Edges>
         </RoundedBox>
       ))}
-      {/* 背板：一整片沿弧的曲面背墙，封住所有缝隙（墙成墙，书不再浮在星海里）*/}
-      <mesh position={[0, BOOKWALL.height / 2, 0]} receiveShadow>
-        <cylinderGeometry
-          args={[BOOKWALL.radius + 0.34, BOOKWALL.radius + 0.34, BOOKWALL.height + 0.2, 64, 1, true, Math.PI / 2 - BOOKWALL.a1, BOOKWALL.a1 - BOOKWALL.a0]}
-        />
-        <meshStandardMaterial color={"#1c130c"} roughness={0.92} metalness={0.02} side={THREE.DoubleSide} />
-      </mesh>
-      {/* 弧两端的封板：从观星台侧望过来曾是敞开的截面——隔板悬空、书浮在星上（审计 P2）*/}
-      {[BOOKWALL.a0, BOOKWALL.a1].map((a, i) => {
-        const ex = Math.cos(a) * (BOOKWALL.radius + 0.05);
-        const ez = Math.sin(a) * (BOOKWALL.radius + 0.05);
-        return (
-          <mesh key={`cap${i}`} position={[ex, BOOKWALL.height / 2, ez]} rotation={[0, a + Math.PI / 2, 0]} castShadow material={woodWarmMat}>
-            <boxGeometry args={[0.08, BOOKWALL.height + 0.2, 0.62]} />
+      {/* 静态壳（baked 时由 BakedShell 的分灯 lightmap 版本接管；立柱因 Edges 描边保留程序化）*/}
+      {!baked && (
+        <>
+          {/* 背板：一整片沿弧的曲面背墙，封住所有缝隙（墙成墙，书不再浮在星海里）*/}
+          <mesh name="wall-back" userData={{ ljBake: "static" }} position={[0, BOOKWALL.height / 2, 0]} receiveShadow>
+            <cylinderGeometry
+              args={[BOOKWALL.radius + 0.34, BOOKWALL.radius + 0.34, BOOKWALL.height + 0.2, 64, 1, true, Math.PI / 2 - BOOKWALL.a1, BOOKWALL.a1 - BOOKWALL.a0]}
+            />
+            <meshStandardMaterial color={"#1c130c"} roughness={0.92} metalness={0.02} side={THREE.DoubleSide} />
           </mesh>
-        );
-      })}
-      {shelves.map((s, i) => (
-        <RoundedBox key={`s${i}`} args={[s.w, 0.05, 0.56]} radius={0.012} smoothness={2} position={s.p} rotation={[0, s.ry, 0]} material={woodMat} />
-      ))}
-      <instancedMesh ref={meshRef} args={[spineGeom, undefined, instances.length]} castShadow frustumCulled={false}>
+          {/* 弧两端的封板：从观星台侧望过来曾是敞开的截面——隔板悬空、书浮在星上（审计 P2）*/}
+          {[BOOKWALL.a0, BOOKWALL.a1].map((a, i) => {
+            const ex = Math.cos(a) * (BOOKWALL.radius + 0.05);
+            const ez = Math.sin(a) * (BOOKWALL.radius + 0.05);
+            return (
+              <mesh key={`cap${i}`} name="wall-cap" userData={{ ljBake: "static" }} position={[ex, BOOKWALL.height / 2, ez]} rotation={[0, a + Math.PI / 2, 0]} castShadow material={woodWarmMat}>
+                <boxGeometry args={[0.08, BOOKWALL.height + 0.2, 0.62]} />
+              </mesh>
+            );
+          })}
+          {shelves.map((s, i) => (
+            <RoundedBox key={`s${i}`} name="wall-shelf" userData={{ ljBake: "static" }} args={[s.w, 0.05, 0.56]} radius={0.012} smoothness={2} position={s.p} rotation={[0, s.ry, 0]} material={woodMat} />
+          ))}
+        </>
+      )}
+      <instancedMesh name="wall-books" userData={{ ljBake: "occluder" }} ref={meshRef} args={[spineGeom, undefined, instances.length]} castShadow frustumCulled={false}>
         <meshStandardMaterial roughness={0.82} metalness={0.0} />
       </instancedMesh>
       {/* 书墙暖补光（无影、克制）：给整面墙横向的可读层次，别让它糊成一块暗板。

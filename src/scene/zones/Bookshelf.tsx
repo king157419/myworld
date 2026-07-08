@@ -114,8 +114,9 @@ export default function Bookshelf({ zone }: { zone: Zone }) {
           </group>
         )}
 
-        {/* 思考越多，书墙暖光越亮 */}
+        {/* 思考越多，书墙暖光越亮（内容灯：数据驱动，烘焙管线跳过——见 tools/bake） */}
         <pointLight
+          userData={{ ljBake: "content" }}
           position={[anchor.position[0] + 1.0, anchor.position[1] - 0.3, anchor.position[2]]}
           color={PALETTE.lampWarm}
           intensity={lightIntensity}

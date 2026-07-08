@@ -32,6 +32,13 @@ function DevBridge() {
     void import("../data/db").then((db) => {
       w.__ljDb = db;
     });
+    // 烘焙管线导出器（tools/bake/ 用）：__ljExport.shell() / .lights()
+    void import("./devExport").then((ex) => {
+      (w as { __ljExport?: unknown }).__ljExport = {
+        shell: () => ex.exportShell(scene),
+        lights: () => ex.exportLights(scene),
+      };
+    });
   }, [gl, scene, camera, advance, invalidate]);
   return null;
 }
@@ -94,7 +101,7 @@ export default function Experience() {
         <Sky />
         <Vista />
         <Lighting low={low} />
-        <Gallery />
+        <Gallery low={low} />
         <Water low={low} />
         <Atmosphere />
         <SunkenThoughts />
