@@ -60,6 +60,10 @@ bpy.ops.object.join()
 obj = bpy.context.view_layer.objects.active
 obj.name = "gramophone"
 
+# 平滑法线（按角度）：glTF 往返容易把原模型的平滑组拍平成 faceted——
+# 喇叭内壁一旦逐面法线，铃口灯的入射点积整片为负=黑月牙（F1 复发的第三种长相）。
+bpy.ops.object.shade_smooth_by_angle(angle=math.radians(50.0))
+
 # 只留一张新 smart-project UV（原 UV 没有贴图在用，运行时 aoMap 走 channel 0）
 while obj.data.uv_layers:
     obj.data.uv_layers.remove(obj.data.uv_layers[0])

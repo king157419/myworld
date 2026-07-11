@@ -19,11 +19,13 @@ import { LIGHTMAP_META } from "./shellLightmap.meta";
 const URL_GLB = "/lightmaps/shell-baked.glb";
 const URL_LM = "/lightmaps/shell-lightmap.png";
 
-// 运行时定标（乘上 meta 里各通道的烘焙 scale）；平衡的旋钮集中在这里。
-const K_WARM = 0.55;
-const K_MOON = 0.35;
+// 运行时定标：贴图当**归一化分布**用（sqrt 解码后 0..1），绝对亮度全由这些旋钮
+// 以 three 的辐照度单位艺术决定——Blender 的 W/m² 和 three 的 candela 本就不通约，
+// meta 里的 scale 只作 provenance（重烘后如果分布定标漂了，回来重调这里）。
+const K_WARM = 1.4; // 0.55 时 A/B 几乎不可辨——间接反弹要读得出"灯洇进木头"才算数
+const K_MOON = 0.05; // 月光纯间接反弹在暗材质上≈0，本轮通道近空（p99.7=1e-4，放大即噪声）——先几乎关死
 const K_SKY = 0.5;
-const K_AO = 0.75; // 平坦环境光/半球光/IBL 漫反射被天光遮蔽压下去的比例
+const K_AO = 0.85; // 平坦环境光/半球光/IBL 漫反射被天光遮蔽压下去的比例
 
 /** 烘焙产物是否可用（install.mjs 未跑过时 res=0，直接不挂载）。 */
 export const hasBakedShell = LIGHTMAP_META.res > 0;
@@ -46,9 +48,9 @@ export default function BakedShell() {
 
   // mood → 分组强度：暖通道跟 lampMul 呼吸，天光跟 hemiIntensity，月光是锚不动。
   useEffect(() => {
-    uniforms.uLmWarm.value.set(PALETTE.lampWarm).multiplyScalar(K_WARM * LIGHTMAP_META.warmScale * preset.lampMul);
-    uniforms.uLmMoon.value.set("#b7c6ea").multiplyScalar(K_MOON * LIGHTMAP_META.moonScale);
-    uniforms.uLmSky.value.set("#3f5484").multiplyScalar(K_SKY * LIGHTMAP_META.skyScale * (preset.hemiIntensity / 0.92));
+    uniforms.uLmWarm.value.set(PALETTE.lampWarm).multiplyScalar(K_WARM * preset.lampMul);
+    uniforms.uLmMoon.value.set("#b7c6ea").multiplyScalar(K_MOON);
+    uniforms.uLmSky.value.set("#3f5484").multiplyScalar(K_SKY * (preset.hemiIntensity / 0.92));
   }, [preset, uniforms]);
 
   const root = useMemo(() => {

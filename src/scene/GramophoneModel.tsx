@@ -1,5 +1,5 @@
 import { Suspense, useMemo } from "react";
-import { useGLTF } from "@react-three/drei";
+import { useGLTF, useTexture } from "@react-three/drei";
 import * as THREE from "three";
 import { GRAMOPHONE, PALETTE } from "../theme";
 
@@ -10,6 +10,9 @@ import { GRAMOPHONE, PALETTE } from "../theme";
 // zones/RecordPlayer 仍在 GRAMOPHONE 处叠加旋转黑胶与播放灯（数据契约不动）。
 
 const URL = "/models/gramophone.glb";
+// tools/bake/bake_gramophone.py 的产物：smart-UV 重展后的 Cycles AO（木箱缝隙/喇叭根部的接触阴影，
+// 程序化实时光给不了）。GLB 与 AO 同一次烘焙出品，UV 才对得上——只换其一会错位。
+const AO_URL = "/models/gramophone_ao.png";
 
 const TARGET_H = 1.32; // 留声机连喇叭的总高（米）
 const ROT_Y = Math.PI; // 朝向：让喇叭口/正面对着来客(+Z)；按实拍校正
@@ -17,12 +20,13 @@ const LIFT = 0.0; // 需要时整体抬高一点点贴合台面
 
 // 原模型 10 个占位材质 → 调色板角色（按 GLTFLoader 保留的材质名匹配）。
 // doubleSide：喇叭是单层薄壳，不开双面则从口往里看是"黑洞剪影"——内壁开双面 + 暖自发光，从里发金。
-type Spec = { color: string; metalness: number; roughness: number; emissive?: string; emissiveIntensity?: number; doubleSide?: boolean };
+type Spec = { color: string; metalness: number; roughness: number; emissive?: string; emissiveIntensity?: number; doubleSide?: boolean; noAo?: boolean };
 const REMAT: Record<string, Spec> = {
   // 喇叭主体：第九轮 metal 0.6 / emissive 0.2 在薄 env 下仍大片死黑（近看破相，审计 F1）——
-  // 再降金属度让暖点光的漫反射接手，自发光抬到"内壁常暖"的量级
-  mat19: { color: PALETTE.brass, metalness: 0.42, roughness: 0.5, emissive: PALETTE.glowAmber, emissiveIntensity: 0.42, doubleSide: true },
-  mat18: { color: "#e6c184", metalness: 0.4, roughness: 0.45, emissive: PALETTE.glowAmber, emissiveIntensity: 0.7, doubleSide: true }, // 喇叭内唇：自发光金
+  // 再降金属度让暖点光的漫反射接手，自发光抬到"内壁常暖"的量级。
+  // noAo：钟形薄壳的 Cycles AO 把内壁当深腔烘成近黑，运行时挂上就是 F1 复发——喇叭壳不吃 AO。
+  mat19: { color: PALETTE.brass, metalness: 0.42, roughness: 0.5, emissive: PALETTE.glowAmber, emissiveIntensity: 0.42, doubleSide: true, noAo: true },
+  mat18: { color: "#e6c184", metalness: 0.4, roughness: 0.45, emissive: PALETTE.glowAmber, emissiveIntensity: 0.7, doubleSide: true, noAo: true }, // 喇叭内唇：自发光金
   mat16: { color: "#7a5f34", metalness: 0.7, roughness: 0.45 }, // 喇叭颈 / 暗黄铜
   mat15: { color: "#9aa0a6", metalness: 0.8, roughness: 0.5 }, // 钢件（唱针臂）—— 提 roughness 压掉刺眼白斑
   mat22: { color: "#5a5e66", metalness: 0.65, roughness: 0.52 }, // 暗金属件
@@ -35,7 +39,12 @@ const REMAT: Record<string, Spec> = {
 
 function Model() {
   const { scene } = useGLTF(URL);
+  const aoTex = useTexture(AO_URL);
   const model = useMemo(() => {
+    aoTex.flipY = false; // glTF UV 约定
+    aoTex.colorSpace = THREE.NoColorSpace;
+    aoTex.channel = 0; // 烘焙 GLB 只有一层 smart-UV
+    aoTex.needsUpdate = true;
     const root = scene.clone(true);
     root.traverse((o) => {
       const mesh = o as THREE.Mesh;
@@ -51,6 +60,10 @@ function Model() {
           std.metalness = spec.metalness;
           std.roughness = spec.roughness;
           std.envMapIntensity = 1.5; // 金属件多吃一点 IBL——env 再厚，默认 1.0 对小曲面仍偏薄
+          if (!spec.noAo) {
+            std.aoMap = aoTex; // 烘焙 AO 只压间接光（环境/半球/IBL），点光与自发光不受影响
+            std.aoMapIntensity = 0.85;
+          }
           if (spec.emissive) {
             std.emissive = new THREE.Color(spec.emissive);
             std.emissiveIntensity = spec.emissiveIntensity ?? 0;
@@ -75,7 +88,7 @@ function Model() {
     root.position.z -= center.z;
     root.position.y -= box2.min.y;
     return root;
-  }, [scene]);
+  }, [scene, aoTex]);
 
   return (
     <group position={GRAMOPHONE} rotation={[0, ROT_Y, 0]}>
