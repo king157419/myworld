@@ -64,7 +64,7 @@ function MoonGate({ tex }: { tex: THREE.Texture }) {
   }, []);
   const mat = useMemo(() => {
     const m = new THREE.MeshStandardMaterial({ map: tex.clone(), roughness: 0.95 });
-    m.map!.repeat.set(6, 1.5);
+    m.map!.repeat.set(3, 1); // 评审 R12·C4：收敛频率，不再读作波纹铁皮
     m.map!.needsUpdate = true;
     return m;
   }, [tex]);
@@ -196,6 +196,11 @@ export default function Shell() {
   const roofFrontEave = STUDY.zFront + 0.35; // 前檐罩住廊
   const roofW = (STUDY.x1 - STUDY.x0) + 1.0;
 
+  // 评审 R12·C8：书房后墙顶（wallTop）与后坡顶底面之间原来漏空——站在琴角能望见墙外的山。
+  // 算出后墙平面处的坡顶底高度，补一道山尖三角把这道缝封死（后檐坡由脊 z=ridgeZ 落到 roofBackEave）。
+  const wallTop = Y_STUDY + STUDY.wallH;
+  const roofUnderBack = roofEaveY + ((roofBackEave - STUDY.zBack) / (roofBackEave - ridgeZ)) * (roofTopY - roofEaveY) + 0.08;
+
   return (
     <group>
       {/* ───────── 庭院地面（湿暗底 + 石径） ───────── */}
@@ -206,13 +211,13 @@ export default function Shell() {
       <Path />
 
       {/* ───────── 围墙（带渍宣白 + 黛瓦压顶） ───────── */}
-      {/* 东西墙 */}
-      <XuanWall p={[-WALL.x, wallCY, perimMidZ]} s={[T, WALL.height, perimDepth]} tex={tex} repeat={[perimDepth / 3, 1.5]} />
-      <XuanWall p={[WALL.x, wallCY, perimMidZ]} s={[T, WALL.height, perimDepth]} tex={tex} repeat={[perimDepth / 3, 1.5]} />
+      {/* 东西墙（横向 repeat 拉稀、竖向 repeat=1 → 不再横向分层结带；评审 R12·C4） */}
+      <XuanWall p={[-WALL.x, wallCY, perimMidZ]} s={[T, WALL.height, perimDepth]} tex={tex} repeat={[perimDepth / 4.5, 1]} />
+      <XuanWall p={[WALL.x, wallCY, perimMidZ]} s={[T, WALL.height, perimDepth]} tex={tex} repeat={[perimDepth / 4.5, 1]} />
       <Coping p={[-WALL.x, 0, perimMidZ]} len={perimDepth} horizontal={false} />
       <Coping p={[WALL.x, 0, perimMidZ]} len={perimDepth} horizontal={false} />
       {/* 北墙（书房后） */}
-      <XuanWall p={[0, wallCY, northZ]} s={[WALL.x * 2, WALL.height, T]} tex={tex} repeat={[WALL.x * 2 / 3, 1.5]} />
+      <XuanWall p={[0, wallCY, northZ]} s={[WALL.x * 2, WALL.height, T]} tex={tex} repeat={[WALL.x * 2 / 4.5, 1]} />
       <Coping p={[0, 0, northZ]} len={WALL.x * 2} horizontal={true} />
       {/* 南墙 = 月洞门 */}
       <MoonGate tex={tex} />
@@ -247,6 +252,8 @@ export default function Shell() {
       </mesh>
       {/* 后墙 + 侧墙（带渍宣白） */}
       <XuanWall p={[0, Y_STUDY + STUDY.wallH / 2, STUDY.zBack]} s={[STUDY.x1 - STUDY.x0, STUDY.wallH, T]} tex={tex} repeat={[1.6, 1]} />
+      {/* 后墙上方封缝三角（评审 R12·C8：补墙顶↔坡顶交接，遮住外面的山） */}
+      <XuanWall p={[0, (wallTop + roofUnderBack) / 2, STUDY.zBack]} s={[STUDY.x1 - STUDY.x0, roofUnderBack - wallTop, T]} tex={tex} repeat={[1.6, 0.3]} />
       <XuanWall p={[STUDY.x0, Y_STUDY + STUDY.wallH / 2, (STUDY.zBack + STUDY.zRoom) / 2]} s={[T, STUDY.wallH, STUDY.zRoom - STUDY.zBack]} tex={tex} repeat={[1.4, 1]} />
       <XuanWall p={[STUDY.x1, Y_STUDY + STUDY.wallH / 2, (STUDY.zBack + STUDY.zRoom) / 2]} s={[T, STUDY.wallH, STUDY.zRoom - STUDY.zBack]} tex={tex} repeat={[1.4, 1]} />
       {/* 前墙：中央门洞 + 两侧格窗 */}

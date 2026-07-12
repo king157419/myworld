@@ -6,7 +6,8 @@ import { seededRng } from "../../scene/rng";
 
 // 西侧一株松 + 一方湖石 + 池畔苔草。灰绿色域、剪影感；松略欹侧（中式园林的姿态）。
 
-const pineMat = new THREE.MeshStandardMaterial({ color: COURT_PALETTE.pine, roughness: 0.9 });
+// 评审 R12·C3：松冠原色偏深，弱天光下背光面塌成纯黑。提一档灰绿 + 极低自发光地板（受光但不纯黑）。
+const pineMat = new THREE.MeshStandardMaterial({ color: "#3f4b39", roughness: 0.9, emissive: new THREE.Color("#212a1f"), emissiveIntensity: 0.14 });
 const mossMat = new THREE.MeshStandardMaterial({ color: COURT_PALETTE.moss, roughness: 0.95, side: THREE.DoubleSide });
 
 /** 一株欹松：斜干 + 几层扁平针叶冠。 */

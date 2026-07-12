@@ -38,20 +38,53 @@ const rippleFrag = /* glsl */ `
         float period = 1.4 + rnd.x*1.6;
         float ph = fract(uTime/period + rnd.y);
         float radius = ph*0.55;
-        float ring = exp(-pow((d-radius)/0.03, 2.0)); // 细环
+        float ring = exp(-pow((d-radius)/0.02, 2.0)); // 更细的环（评审 R12·C1）
         float fade = (1.0-ph);
         acc += ring*fade;
       }
     }
     acc = clamp(acc, 0.0, 1.0) * uRain;
-    gl_FragColor = vec4(uColor*acc, acc*0.5);
+    // 评审 R12·C1：涟漪圈从霓虹白圈压成细灰绿——透明度降到 ~0.16，颜色改灰绿。
+    gl_FragColor = vec4(uColor*acc, acc*0.16);
   }
 `;
+
+// —— 菲涅尔灰绿光泽层（评审 R12·C1：池面不许纯黑，掠射角要有最低限度的天空反射面感） ——
+const sheenVert = /* glsl */ `
+  varying vec3 vView;
+  varying vec3 vN;
+  void main(){
+    vec4 wp = modelMatrix * vec4(position, 1.0);
+    vView = normalize(cameraPosition - wp.xyz);
+    vN = normalize(mat3(modelMatrix) * normal);
+    gl_Position = projectionMatrix * viewMatrix * wp;
+  }
+`;
+const sheenFrag = /* glsl */ `
+  precision highp float;
+  varying vec3 vView;
+  varying vec3 vN;
+  uniform vec3 uColor;
+  void main(){
+    float f = pow(1.0 - clamp(dot(vView, vN), 0.0, 1.0), 3.0);
+    gl_FragColor = vec4(uColor, f * 0.4);
+  }
+`;
+
+function PoolSheen() {
+  const uniforms = useMemo(() => ({ uColor: { value: new THREE.Color("#54655b") } }), []);
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.008, 0]} renderOrder={2}>
+      <circleGeometry args={[POOL.r * 0.995, 64]} />
+      <shaderMaterial vertexShader={sheenVert} fragmentShader={sheenFrag} uniforms={uniforms} transparent depthWrite={false} toneMapped={false} />
+    </mesh>
+  );
+}
 
 function Ripples({ rain }: { rain: number }) {
   const mat = useRef<THREE.ShaderMaterial>(null);
   const uniforms = useMemo(
-    () => ({ uTime: { value: 0 }, uRain: { value: rain }, uColor: { value: new THREE.Color("#9fb0a6") } }),
+    () => ({ uTime: { value: 0 }, uRain: { value: rain }, uColor: { value: new THREE.Color("#7c8a80") } }),
     [], // eslint-disable-line react-hooks/exhaustive-deps
   );
   useFrame((s) => {
@@ -75,22 +108,23 @@ export default function Pool({ rain = 1, low = false }: { rain?: number; low?: b
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} renderOrder={2}>
         <circleGeometry args={[POOL.r, 64]} />
         {low ? (
-          <meshStandardMaterial color={COURT_PALETTE.poolDeep} roughness={0.4} metalness={0.5} envMapIntensity={0.2} />
+          <meshStandardMaterial color={COURT_PALETTE.poolSheen} roughness={0.34} metalness={0.55} envMapIntensity={0.25} />
         ) : (
+          // 评审 R12·C1：略提 albedo（深墨绿有微光，非黑洞）+ 抬高反射强度让灰绿天空/竹影映进来。
           <MeshReflectorMaterial
             resolution={512}
             blur={[160, 60]}
-            mixBlur={0.95}
-            mixStrength={1.1}
+            mixBlur={0.9}
+            mixStrength={1.35}
             mixContrast={1.1}
-            mirror={0.55}
+            mirror={0.6}
             depthScale={0.5}
             minDepthThreshold={0.4}
             maxDepthThreshold={1.3}
             color={COURT_PALETTE.poolDeep}
-            roughness={0.72}
+            roughness={0.66}
             metalness={1}
-            envMapIntensity={0.15}
+            envMapIntensity={0.3}
             transparent
             opacity={0.92}
             depthWrite={false}
@@ -98,6 +132,8 @@ export default function Pool({ rain = 1, low = false }: { rain?: number; low?: b
           />
         )}
       </mesh>
+      {/* 菲涅尔灰绿光泽（掠射面感，池面不再纯黑黑洞） */}
+      <PoolSheen />
       {/* 雨滴涟漪 */}
       <Ripples rain={rain} />
       {/* 石缘（磨圆湿石一圈） */}

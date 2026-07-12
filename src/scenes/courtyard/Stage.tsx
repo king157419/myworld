@@ -1,5 +1,6 @@
 import type { Zone, ZoneType } from "../../config/types";
 import { useWorld } from "../../store/useWorld";
+import { COURT_PALETTE } from "./materials";
 import { STUDY, Y_STUDY } from "./theme";
 import Backdrop from "./Backdrop";
 import Shell from "./Shell";
@@ -35,11 +36,13 @@ interface MoodCfg {
   lampMul: number;
   mist: string;
 }
+// 评审 R12·C6：整体天色偏白日 → 往黄昏压一档（天空/半球光降亮度、色温微暖灰），
+// 让纸灯「唯一暖点」的对比立起来；压完仍可读（阴天黄昏，不是夜）。
 const COURT_MOOD: Record<string, MoodCfg> = {
-  rainy: { bg: "#8b948d", fogColor: "#88918a", fogDensity: 0.052, ambClr: "#6d7a72", ambInt: 0.42, hemi: 0.52, key: 0.42, keyClr: "#aebcb2", rain: 1.0, rainVol: 0.5, windVol: 0.2, lampMul: 1.0, mist: "#93a09a" },
-  cool: { bg: "#96a099", fogColor: "#909a92", fogDensity: 0.04, ambClr: "#71807a", ambInt: 0.48, hemi: 0.58, key: 0.55, keyClr: "#b4c2b8", rain: 0.6, rainVol: 0.34, windVol: 0.26, lampMul: 0.9, mist: "#9aa7a0" },
-  warm: { bg: "#a2a897", fogColor: "#9aa091", fogDensity: 0.028, ambClr: "#83826d", ambInt: 0.52, hemi: 0.6, key: 0.62, keyClr: "#c8c6a8", rain: 0.3, rainVol: 0.22, windVol: 0.3, lampMul: 1.28, mist: "#a6ad9c" },
-  neutral: { bg: "#98a09a", fogColor: "#929a93", fogDensity: 0.036, ambClr: "#77837c", ambInt: 0.5, hemi: 0.57, key: 0.56, keyClr: "#b8c2ba", rain: 0.5, rainVol: 0.3, windVol: 0.26, lampMul: 1.05, mist: "#9ca89f" },
+  rainy: { bg: "#78817a", fogColor: "#747c76", fogDensity: 0.052, ambClr: "#66706a", ambInt: 0.34, hemi: 0.42, key: 0.4, keyClr: "#aeb0a0", rain: 1.0, rainVol: 0.5, windVol: 0.2, lampMul: 1.08, mist: "#828f88" },
+  cool: { bg: "#7f8a82", fogColor: "#7b857e", fogDensity: 0.04, ambClr: "#6a7972", ambInt: 0.39, hemi: 0.47, key: 0.5, keyClr: "#adb6ab", rain: 0.6, rainVol: 0.34, windVol: 0.26, lampMul: 0.98, mist: "#8b978f" },
+  warm: { bg: "#8c9080", fogColor: "#84887a", fogDensity: 0.028, ambClr: "#7a7860", ambInt: 0.44, hemi: 0.5, key: 0.56, keyClr: "#bebc9e", rain: 0.3, rainVol: 0.22, windVol: 0.3, lampMul: 1.36, mist: "#969c8b" },
+  neutral: { bg: "#7f877f", fogColor: "#7b837c", fogDensity: 0.036, ambClr: "#6f7b74", ambInt: 0.41, hemi: 0.47, key: 0.5, keyClr: "#b0bab1", rain: 0.5, rainVol: 0.3, windVol: 0.26, lampMul: 1.12, mist: "#8f9a92" },
 };
 
 const ZONE_BODY: Record<ZoneType, (p: { zone: Zone; low?: boolean }) => React.JSX.Element> = {
@@ -64,9 +67,9 @@ export default function CourtyardStage({ low }: { low: boolean }) {
       {/* 雾三层之近层：FogExp2（灰绿）——近清晰、中景褪色。天空/水池/远山/雾墙各自 fog=false 不受它。 */}
       <fogExp2 attach="fog" args={[cfg.fogColor, cfg.fogDensity]} />
 
-      {/* 天光：阴天黄昏级冷灰绿（环境 + 半球 + 一盏冷向光主投影） */}
+      {/* 天光：阴天黄昏级冷灰绿（环境 + 半球 + 一盏冷向光主投影）——天顶色压暗一档偏暖灰（评审 R12·C6） */}
       <ambientLight intensity={cfg.ambInt} color={cfg.ambClr} />
-      <hemisphereLight args={["#aeb8b0", "#3a4038", cfg.hemi]} />
+      <hemisphereLight args={["#98a29a", "#363c34", cfg.hemi]} />
       <directionalLight
         position={[5, 9, 6]}
         intensity={cfg.key}
@@ -102,6 +105,10 @@ export default function CourtyardStage({ low }: { low: boolean }) {
       <PaperLantern position={[1.85, eaveY - 0.35, STUDY.zFront + 0.06]} intensity={3.4} distance={4.0} scale={1.0} mul={cfg.lampMul} low={low} />
       {/* 书房内一盏（屋内主暖光，把矮几浸暖、透过格窗渗出「屋里暖」） */}
       <PaperLantern position={[0, Y_STUDY + STUDY.wallH - 0.5, -4.7]} intensity={3.6} distance={3.8} scale={0.95} mul={cfg.lampMul} low={low} />
+      {/* 书房顶部极低补光（评审 R12·C3）：把坡顶底面 / 博古架顶板 / 后角从纯黑里托出，仍暗 */}
+      {!low && (
+        <pointLight userData={{ ljBake: "content" }} position={[0, Y_STUDY + 2.5, -5.3]} color={COURT_PALETTE.lampWarm} intensity={0.55} distance={5.5} decay={2} />
+      )}
 
       {/* 三个数据驱动 zone（按 type 分发；内容过滤/聚焦/登记全用 zone.id） */}
       {zones.map((zone) => {

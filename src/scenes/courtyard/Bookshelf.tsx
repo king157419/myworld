@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import type { Zone } from "../../config/types";
 import { useWorld } from "../../store/useWorld";
@@ -39,6 +39,77 @@ function ScrollTexture(): THREE.CanvasTexture {
   return tex;
 }
 
+// 评审 R12·C2：挂着的立轴原来是空白纸条——个人印记的可视载体必须有墨。
+// 用 canvas 2D 把种子条目真的写上去：竖排、大字标题 + 小字批注，楷体栈，纸面黄化斑驳，墨有浓淡（globalAlpha 抖动）。
+const KAITI = "'Kaiti SC','KaiTi','STKaiti',serif";
+function makeScrollInkTexture(title: string, body: string): THREE.CanvasTexture {
+  const W = 180;
+  const H = 512; // ≤512² 每幅
+  const c = document.createElement("canvas");
+  c.width = W;
+  c.height = H;
+  const ctx = c.getContext("2d")!;
+  // 做旧宣纸底 + 暖光晕
+  ctx.fillStyle = "#e7d6a9";
+  ctx.fillRect(0, 0, W, H);
+  const g = ctx.createRadialGradient(W / 2, H * 0.4, 20, W / 2, H * 0.45, H * 0.62);
+  g.addColorStop(0, "rgba(255,246,214,0.5)");
+  g.addColorStop(1, "rgba(150,120,72,0.28)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  // 黄化斑驳
+  for (let i = 0; i < 26; i++) {
+    const x = Math.random() * W;
+    const y = Math.random() * H;
+    const r = 6 + Math.random() * 24;
+    const rg = ctx.createRadialGradient(x, y, 0, x, y, r);
+    const a = 0.04 + Math.random() * 0.08;
+    rg.addColorStop(0, `rgba(150,120,70,${a})`);
+    rg.addColorStop(1, "rgba(150,120,70,0)");
+    ctx.fillStyle = rg;
+    ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  ctx.textBaseline = "top";
+  ctx.textAlign = "center";
+  const ink = "#241a12";
+  ctx.fillStyle = ink;
+  // 标题：竖排大字，最右一列
+  const titleSize = 30;
+  const titleX = W - 26;
+  let ty = 28;
+  for (const ch of Array.from(title).slice(0, 6)) {
+    ctx.font = `bold ${titleSize}px ${KAITI}`;
+    ctx.globalAlpha = 0.82 + Math.random() * 0.18;
+    ctx.fillText(ch, titleX, ty);
+    ty += titleSize + 6;
+  }
+  // 正文批注：小字竖排，自右向左逐列换行；globalAlpha 抖动模拟墨的浓淡枯润
+  const bodySize = 15;
+  const colStep = bodySize + 6;
+  const rowStep = bodySize + 3;
+  const topY = 40;
+  const botY = H - 26;
+  let cx = titleX - 36;
+  let cy = topY;
+  const text = Array.from(body.replace(/\s+/g, "")).slice(0, 64);
+  ctx.font = `${bodySize}px ${KAITI}`;
+  for (const ch of text) {
+    if (cy > botY) {
+      cy = topY;
+      cx -= colStep;
+      if (cx < 14) break;
+    }
+    ctx.globalAlpha = 0.5 + Math.random() * 0.5;
+    ctx.fillText(ch, cx, cy);
+    cy += rowStep;
+  }
+  ctx.globalAlpha = 1;
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+
 const AGED = ["#e4d3a6", "#d8c48f", "#e9dcb4", "#cdb884"];
 
 export default function CourtyardBookshelf({ zone, low = false }: { zone: Zone; low?: boolean }) {
@@ -52,6 +123,16 @@ export default function CourtyardBookshelf({ zone, low = false }: { zone: Zone; 
   const total = Math.max(3, Math.min(thoughts.length || 3, 8));
   const hung = Math.ceil(total / 2);
   const rolled = total - hung;
+
+  // 挂着的立轴写上对应思考的正文（有墨）；无对应条目的挂轴留白。生成后随数据变化释放旧贴图。
+  const inkTextures = useMemo(
+    () => Array.from({ length: hung }).map((_, i) => {
+      const t = thoughts[i];
+      return t ? makeScrollInkTexture(t.title, t.body) : null;
+    }),
+    [thoughts, hung],
+  );
+  useEffect(() => () => { for (const tex of inkTextures) tex?.dispose(); }, [inkTextures]);
 
   const rackH = 1.9;
   const rackW = 1.7;
@@ -81,10 +162,10 @@ export default function CourtyardBookshelf({ zone, low = false }: { zone: Zone; 
           <boxGeometry args={[rackW, 0.05, 0.34]} />
         </mesh>
 
-        {/* 挂着的立轴（挂几幅；点亮的偏亮一档，代表被写下的思考） */}
+        {/* 挂着的立轴（挂几幅；有墨的立轴＝被写下的思考，纸面微光收敛不像灯管） */}
         {Array.from({ length: hung }).map((_, i) => {
           const x = -rackW / 2 + ((i + 0.5) / hung) * rackW;
-          const lit = i < thoughts.length;
+          const tex = inkTextures[i];
           const h = 1.0 + (i % 3) * 0.14;
           const col = AGED[i % AGED.length];
           return (
@@ -92,10 +173,14 @@ export default function CourtyardBookshelf({ zone, low = false }: { zone: Zone; 
               {/* 天杆 + 地轴（木） */}
               <mesh position={[0, h / 2, 0]} rotation={[0, 0, Math.PI / 2]} material={woodMat}><cylinderGeometry args={[0.016, 0.016, 0.34, 6]} /></mesh>
               <mesh position={[0, -h / 2, 0]} rotation={[0, 0, Math.PI / 2]} material={woodMat}><cylinderGeometry args={[0.02, 0.02, 0.36, 6]} /></mesh>
-              {/* 画心（做旧宣纸；点亮微光收敛） */}
+              {/* 画心：有对应思考 → 写上正文的做旧宣纸（emissiveMap 让纸面自发微光而墨迹仍暗）；否则留白 */}
               <mesh>
                 <planeGeometry args={[0.28, h]} />
-                <meshStandardMaterial color={col} emissive={new THREE.Color(COURT_PALETTE.glowAmber)} emissiveIntensity={lit ? 0.14 : 0} roughness={0.9} side={THREE.DoubleSide} toneMapped={false} />
+                {tex ? (
+                  <meshStandardMaterial map={tex} emissiveMap={tex} emissive={new THREE.Color("#ffd9a0")} emissiveIntensity={0.2} roughness={0.9} side={THREE.DoubleSide} toneMapped={false} />
+                ) : (
+                  <meshStandardMaterial color={col} roughness={0.9} side={THREE.DoubleSide} />
+                )}
               </mesh>
             </group>
           );

@@ -2,6 +2,7 @@ import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { seededRng } from "../../scene/rng";
+import { GATE, WALL } from "./theme";
 
 // 围墙外的远方（满分定义「雾三层」的中景 + 远景层；近景清晰交给全局 FogExp2）。
 //   · 远山：三层锥岭剪影（InstancedMesh，各 1 次绘制），一层比一层浅——
@@ -91,6 +92,18 @@ function MistBanks({ color }: { color: string }) {
   );
 }
 
+/** 月洞门空气透视幕（评审 R12·C5）：门洞后一层比天空略暗的雾幕，
+ *  把穿洞可见的远山「压回」雾里、与全局雾/远山同一分层色阶——不再像贴了张 porthole 贴纸。 */
+function GateVeil({ mistColor }: { mistColor: string }) {
+  const col = useMemo(() => new THREE.Color(mistColor).lerp(new THREE.Color("#000000"), 0.3), [mistColor]);
+  return (
+    <mesh position={[0, GATE.cy, WALL.zGate + 0.25]} renderOrder={0}>
+      <circleGeometry args={[GATE.r * 1.04, 48]} />
+      <meshBasicMaterial color={col} transparent opacity={0.5} side={THREE.DoubleSide} depthWrite={false} fog={false} toneMapped={false} />
+    </mesh>
+  );
+}
+
 export default function Backdrop({ mistColor = "#8b978f", low = false }: { mistColor?: string; low?: boolean }) {
   const group = useRef<THREE.Group>(null);
   // 远山极缓的呼吸（几乎察觉不到，只为不完全死板）——不必要时可省。
@@ -105,6 +118,8 @@ export default function Backdrop({ mistColor = "#8b978f", low = false }: { mistC
       <Ridge radius={70} count={18} hMin={12} hMax={22} color={SKY_STEPS[2]} seed={123} />
       {/* 中景雾墙（low 档减半团数由 opacity 已足够轻，保留全部以守住三层观感） */}
       {!low && <MistBanks color={mistColor} />}
+      {/* 月洞门空气透视幕：让穿洞远景与全局雾同色阶、略暗于天空 */}
+      <GateVeil mistColor={mistColor} />
     </group>
   );
 }

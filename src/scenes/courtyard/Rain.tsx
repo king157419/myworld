@@ -7,8 +7,9 @@ import { seededRng } from "../../scene/rng";
 // 细雨（比 loft 雨夜克制）+ 檐口滴水线。满分锚：雨是密而小的实心水丝 / 水珠（非发光大圈——场景 A 教训），
 // 灰白低透明、非加色（读作水不是光）；檐口的雨从瓦沿成串滴落。
 
-const rainMat = new THREE.MeshBasicMaterial({ color: new THREE.Color("#b7c1bb"), transparent: true, opacity: 0.34, depthWrite: false, fog: true });
-const dropMat = new THREE.MeshBasicMaterial({ color: new THREE.Color("#c4cdc7"), transparent: true, opacity: 0.6, depthWrite: false, fog: true });
+// 评审 R12·C7：旧雨丝偏白亮读作雪痕。压低亮度/透明度、颜色改淡灰（读作水不是光/雪）。
+const rainMat = new THREE.MeshBasicMaterial({ color: new THREE.Color("#9aa39d"), transparent: true, opacity: 0.2, depthWrite: false, fog: true });
+const dropMat = new THREE.MeshBasicMaterial({ color: new THREE.Color("#a9b2ac"), transparent: true, opacity: 0.4, depthWrite: false, fog: true });
 
 /** 细雨帘：一体积内的下落水丝，逐帧循环（1 次绘制）。 */
 function Curtain({ rain, low }: { rain: number; low: boolean }) {
@@ -45,7 +46,7 @@ function Curtain({ rain, low }: { rain: number; low: boolean }) {
       m.setMatrixAt(i, dummy.matrix);
     }
     m.instanceMatrix.needsUpdate = true;
-    (m.material as THREE.MeshBasicMaterial).opacity = 0.34 * rain;
+    (m.material as THREE.MeshBasicMaterial).opacity = 0.2 * rain;
   });
   return <instancedMesh ref={ref} args={[geom, rainMat, N]} frustumCulled={false} />;
 }
@@ -93,7 +94,7 @@ function Drips({ rain }: { rain: number }) {
       m.setMatrixAt(i, dummy.matrix);
     }
     m.instanceMatrix.needsUpdate = true;
-    (m.material as THREE.MeshBasicMaterial).opacity = 0.6 * rain;
+    (m.material as THREE.MeshBasicMaterial).opacity = 0.4 * rain;
   });
   const geom = useMemo(() => new THREE.CylinderGeometry(0.012, 0.006, 0.12, 6), []);
   return <instancedMesh ref={ref} args={[geom, dropMat, cols.length]} frustumCulled={false} />;
