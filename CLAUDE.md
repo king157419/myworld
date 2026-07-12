@@ -54,6 +54,19 @@ npm test         # 单测：IndexedDB 真实往返 + 漫游求解器纯函数
 npm run build    # tsc 严格档 + vite 生产构建
 ```
 
+## 本机环境备忘（红色报错归因，2026-07 实录）
+
+红色 ≠ 坏了。历史红错约四分之三与代码无关，先对号入座再动手：
+
+- **假红一：PowerShell 5.1 的 NativeCommandError/RemoteException**——原生命令往 stderr 写进度（npm build 的 vite 输出、git 提示）整段穿红，exit 0 即成功；看退出码不看颜色。
+- **假红二：Vite HMR 陈旧模块图**——后台 agent 批量改 src 后浏览器报 `does not provide an export`，而 `npm run build` 是绿的 → 重启 dev server 即愈，不要顺着报错去"修"代码。
+- **网络类真错（ECONNRESET / agent 停摆 / schannel 撤销检查失败）**：根因是 Clash TUN 不稳或机器睡眠断网，先查代理与电源，别怀疑仓库。电源方案已改为**接电永不睡眠 + 10 分钟关屏**（改回默认：`powercfg /change standby-timeout-ac 25`）——通宵跑任务屏幕黑掉是正常的，进程还在。
+- **EADDRINUSE 5199** = 截图接收器（`tools/bake/receiver.mjs`）孤儿进程——直接复用，或杀掉重启。
+- **素材采集白名单**：Freesound / Wikimedia / incompetech 一次就中；Pixabay / Getty / archive.org 会被拦——失败两次立刻换源，不恋战。许可只收 CC0/CC-BY（BY-SA 不收），全部进 `ASSETS.md` 台账。
+- **工具**：ffmpeg 已装（winget `Gyan.FFmpeg`，新开 shell 可见；此前无 ffmpeg 时 GIF 用 `D:\conda\envs\d2l\python.exe` 的 Pillow 拼帧）；裸 `python` 是 Microsoft Store 桩，一律用 `D:\conda\envs\<env>\python.exe`。
+- **多 agent 并行同仓库纪律**：目录不相交 + commit 只 add 自己的文件（绝不 `git add -A`）+ index.lock 冲突重试即过。
+- **评审节奏**：每场景两轮封顶（一轮抓单、二轮修复复拍验证），余项如实挂账——第三轮起边际收益急跌。
+
 ## 改动前自检
 
 - 新功能有没有让"世界可由数据完整重建"不再成立？（把**用户内容**写死进组件、绕过 store 落盘）——若是，停手重想。舞台可编排，内容必须数据驱动。
