@@ -26,11 +26,10 @@ export default function RecordPlayer({ zone }: { zone: Zone }) {
     disc.current.rotation.y += dt * (playing ? 3.8 : 0.0);
   });
 
-  // 留声机唱盘：GLB 模型（GramophoneModel）箱体顶面在世界 y≈1.702、唱针臂在 ≈1.728。
-  // 旋转碟落在唱盘上（贴着模型自带唱片、压在唱针臂下方），让"正在放"的碟真的转。
-  // GRAMOPHONE 世界 y=1.45，故本地 discY = 1.71-1.45 ≈ 0.26。
-  const discY = 0.26; // 紧贴模型唱盘面
-  const labelY = 0.272;
+  // 留声机唱盘：自制 GLB（build_gramophone.py）毛毡顶面在本地 y≈0.242（0.252×缩放 0.961）。
+  // 旋转碟直接贴在毛毡上转（碟厚 0.016，中心 = 0.242+0.008），唱针轴尖从碟心标签下探出。
+  const discY = 0.25; // 紧贴毛毡面
+  const labelY = 0.261;
 
   return (
     <group

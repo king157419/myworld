@@ -27,6 +27,8 @@ export function usePersistence(): boolean {
           hydrate(def, seed);
           await persistNow(def, seed);
         }
+        // 本地收件箱：吸收 public/inbox/<scene>.json 里尚未进世界的内容（幂等，缺席即跳过）。
+        void useWorld.getState().absorbInbox();
       } catch (err) {
         console.error("[lingjing] 读取本地世界失败，使用默认世界：", err);
       } finally {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { serializeWorld, parseSavedWorld, ImportError } from "./io";
+import { serializeWorld, parseSavedWorld, parseEntryBatch, ImportError } from "./io";
 import { defaultWorld } from "../config/defaultWorld";
 import type { Entry } from "../config/types";
 
@@ -114,5 +114,33 @@ describe("io: 非法输入被拒绝（守门）", () => {
     expect(restored.entries[0].body).toBe("");
     expect(restored.entries[0].createdAt).toBe(0);
     expect(restored.entries[0].updatedAt).toBe(0);
+  });
+});
+
+describe("io: parseEntryBatch（本地收件箱内容批）", () => {
+  const zoneIds = new Set(defaultWorld.zones.map((z) => z.id));
+
+  it("accepts { format, entries } wrapper and bare arrays", () => {
+    const wrapped = JSON.stringify({ format: "lingjing.entries.v1", entries: sampleEntries });
+    expect(parseEntryBatch(wrapped, zoneIds)).toEqual(sampleEntries);
+    const bare = JSON.stringify(sampleEntries);
+    expect(parseEntryBatch(bare, zoneIds)).toEqual(sampleEntries);
+  });
+
+  it("rejects entries pointing at unknown zones", () => {
+    const bad = JSON.stringify([{ ...sampleEntries[0], zoneId: "zone-ghost" }]);
+    expect(() => parseEntryBatch(bad, zoneIds)).toThrow(ImportError);
+  });
+
+  it("rejects duplicate ids and illegal types", () => {
+    const dup = JSON.stringify([sampleEntries[0], sampleEntries[0]]);
+    expect(() => parseEntryBatch(dup, zoneIds)).toThrow(ImportError);
+    const badType = JSON.stringify([{ ...sampleEntries[0], type: "dream" }]);
+    expect(() => parseEntryBatch(badType, zoneIds)).toThrow(ImportError);
+  });
+
+  it("rejects files without an entries array", () => {
+    expect(() => parseEntryBatch(JSON.stringify({ hello: 1 }), zoneIds)).toThrow(ImportError);
+    expect(() => parseEntryBatch("not json{", zoneIds)).toThrow(ImportError);
   });
 });

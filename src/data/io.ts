@@ -38,6 +38,53 @@ export function downloadWorld(world: WorldConfig, entries: Entry[], now: number)
 
 class ImportError extends Error {}
 
+/** 单条 entry 的守门 + 归一化（parseSavedWorld 与 parseEntryBatch 共用同一道防线）。 */
+function cleanEntries(list: unknown[], zoneIds: Set<string>): Entry[] {
+  const seen = new Set<string>();
+  return list.map((e, i) => {
+    if (typeof e !== "object" || e === null) throw new ImportError(`第 ${i + 1} 条内容格式错误`);
+    const r = e as Record<string, unknown>;
+    if (!isStr(r.id) || !isStr(r.zoneId)) throw new ImportError(`第 ${i + 1} 条内容缺少 id/zoneId`);
+    if (seen.has(r.id)) throw new ImportError(`内容 id 重复：${r.id}`);
+    seen.add(r.id);
+    if (!ENTRY_TYPES.includes(r.type as (typeof ENTRY_TYPES)[number])) {
+      throw new ImportError(`第 ${i + 1} 条内容的 type 非法：${String(r.type)}`);
+    }
+    if (!zoneIds.has(r.zoneId)) {
+      throw new ImportError(`第 ${i + 1} 条内容指向不存在的功能区：${r.zoneId}`);
+    }
+    // 归一化必填字符串与时间戳；其余可选字段原样保留。
+    return {
+      ...(r as unknown as Entry),
+      title: isStr(r.title) ? r.title : "",
+      body: isStr(r.body) ? r.body : "",
+      createdAt: isNum(r.createdAt) ? r.createdAt : 0,
+      updatedAt: isNum(r.updatedAt) ? r.updatedAt : 0,
+    };
+  });
+}
+
+/**
+ * 解析"内容批"文件（本地收件箱 public/inbox/<scene>.json 用）：
+ * 只有 entries、没有 world——世界结构仍以当前场景为准，zoneId 必须指向给定的真实功能区。
+ * 形状：{ format?: "lingjing.entries.v1", entries: [...] } 或裸数组。
+ */
+export function parseEntryBatch(text: string, zoneIds: Set<string>): Entry[] {
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new ImportError("不是合法的 JSON 文件");
+  }
+  const list = Array.isArray(data)
+    ? data
+    : typeof data === "object" && data !== null && Array.isArray((data as Record<string, unknown>).entries)
+      ? ((data as Record<string, unknown>).entries as unknown[])
+      : null;
+  if (!list) throw new ImportError("内容批文件缺少 entries 数组");
+  return cleanEntries(list, zoneIds);
+}
+
 function isNum(v: unknown): v is number {
   return typeof v === "number" && Number.isFinite(v);
 }
@@ -109,29 +156,7 @@ export function parseSavedWorld(text: string): SavedWorld {
     zoneIds.add(z.id);
   }
   if (!Array.isArray(o.entries)) throw new ImportError("entries 必须是数组");
-
-  const seen = new Set<string>();
-  const cleaned: Entry[] = (o.entries as unknown[]).map((e, i) => {
-    if (typeof e !== "object" || e === null) throw new ImportError(`第 ${i + 1} 条内容格式错误`);
-    const r = e as Record<string, unknown>;
-    if (!isStr(r.id) || !isStr(r.zoneId)) throw new ImportError(`第 ${i + 1} 条内容缺少 id/zoneId`);
-    if (seen.has(r.id)) throw new ImportError(`内容 id 重复：${r.id}`);
-    seen.add(r.id);
-    if (!ENTRY_TYPES.includes(r.type as (typeof ENTRY_TYPES)[number])) {
-      throw new ImportError(`第 ${i + 1} 条内容的 type 非法：${String(r.type)}`);
-    }
-    if (!zoneIds.has(r.zoneId)) {
-      throw new ImportError(`第 ${i + 1} 条内容指向不存在的功能区：${r.zoneId}`);
-    }
-    // 归一化必填字符串与时间戳；其余可选字段原样保留。
-    return {
-      ...(r as unknown as Entry),
-      title: isStr(r.title) ? r.title : "",
-      body: isStr(r.body) ? r.body : "",
-      createdAt: isNum(r.createdAt) ? r.createdAt : 0,
-      updatedAt: isNum(r.updatedAt) ? r.updatedAt : 0,
-    };
-  });
+  const cleaned = cleanEntries(o.entries as unknown[], zoneIds);
 
   return {
     format: isStr(o.format) ? o.format : SAVE_FORMAT,

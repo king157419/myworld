@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { Entry, RoomStyle, WorldConfig } from "../config/types";
 import { defaultWorld } from "../config/defaultWorld";
 import { flushSave, loadWorld, persistNow, saveDebounced } from "../data/db";
+import { fetchInboxAdditions } from "../data/inbox";
 import { SCENE_DATA, resolveScene } from "../scenes/registryData";
 
 // 唯一真相源。渲染层只订阅、不直接改世界结构；所有写入走这些 action。
@@ -43,6 +44,9 @@ interface WorldState {
   // —— 场景切换（多场景架构）——
   /** 切到另一个场景：刷盘当前 → 加载目标（无则种子+落盘）→ hydrate → 清 focus/hover。 */
   switchScene: (style: RoomStyle) => Promise<void>;
+
+  /** 吸收当前场景的本地收件箱（public/inbox/<scene>.json，按 id 幂等）。返回新增条数。 */
+  absorbInbox: () => Promise<number>;
 
   // —— 启动 / 导入时整体替换 ——
   hydrate: (world: WorldConfig, entries: Entry[]) => void;
@@ -130,6 +134,26 @@ export const useWorld = create<WorldState>((set, get) => ({
       await persistNow(def, seed);
     }
     // hydrate 已清 focus/hover。TODO(下一轮)：切场景时按目标场景切换水声/曲库配置（audio/engine）。
+    void get().absorbInbox();
+  },
+
+  absorbInbox: async () => {
+    const s = get();
+    const additions = await fetchInboxAdditions(s.world, s.entries);
+    if (!additions.length) return 0;
+    // 二次去重在 set 回调里做：fetch 是异步的，StrictMode 双挂载/并发 absorb
+    // 都可能拿着同一批增量到达这里——以落笔瞬间的最新状态为准，绝不重复追加。
+    let fresh = 0;
+    set((st) => {
+      const have = new Set(st.entries.map((e) => e.id));
+      const add = additions.filter((e) => !have.has(e.id));
+      fresh = add.length;
+      return add.length ? { entries: [...st.entries, ...add] } : st;
+    });
+    if (!fresh) return 0;
+    await persistNow(get().world, get().entries);
+    console.info(`[lingjing] 收件箱吸收了 ${fresh} 条内容（${s.world.room.style}）`);
+    return fresh;
   },
 
   hydrate: (world, entries) =>

@@ -24,7 +24,9 @@ function useGlowSpines(count: number) {
     const { radius, a0, a1, height, shelves } = BOOKWALL;
     const rowH = height / shelves;
     const segCount = 7;
-    const actual = Math.max(Math.min(count, 24), 3);
+    // 上限 48：日记批量导入后思考可达 60+，24 根书脊在整面书墙上太稀——
+    // instanced 一次 draw，翻倍无感知；再多则书墙开始显乱，先封在 48。
+    const actual = Math.max(Math.min(count, 48), 3);
 
     const spines: { m: THREE.Matrix4; color: THREE.Color }[] = [];
     for (let i = 0; i < actual; i++) {
