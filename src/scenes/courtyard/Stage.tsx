@@ -1,71 +1,113 @@
+import type { Zone, ZoneType } from "../../config/types";
 import { useWorld } from "../../store/useWorld";
-import PlaceholderZone from "../PlaceholderZone";
-import { COURT } from "./data";
+import { STUDY, Y_STUDY } from "./theme";
+import Backdrop from "./Backdrop";
+import Shell from "./Shell";
+import Pool from "./Pool";
+import Bamboo from "./Bamboo";
+import Garden from "./Garden";
+import Rain from "./Rain";
+import { PaperLantern } from "./lamps";
+import CourtyardBookshelf from "./Bookshelf";
+import CourtyardObjectShelf from "./ObjectShelf";
+import Guqin from "./Guqin";
+import { useCourtyardAudio } from "./useCourtyardAudio";
 
-// 雾中山居占位舞台：平地 + 后墙门洞示意 + 三个数据驱动 zone 占位物 + 晨雾柔光。
-// 几何全是原语，只求"能进、能走、能看清、平地 + 门洞"；正式成品后续轮替换。
+// 雾中山居 · v1 成品舞台。
+// 满分锚：雾三层（近清晰 FogExp2 / 中景灰绿雾墙 / 远山剪影，见 Backdrop）× 色域锁死灰绿-宣白-墨黑 ×
+//   纸灯是唯一暖点且低亮度 × 黛瓦雨湿微反光受光不纯黑 × 深墨绿水池 × 屋里暖 / 院里冷。
+// 光照预算：唯一投影主灯 = 冷天光 directional（!low）；纸灯 + 内容灯一律不投影。
+// 天光是阴天黄昏级别的冷灰绿——外冷；书房里靠纸灯与内容灯的暖，进出成双色对比。
 
-const WALL_LEN = COURT.wall.z1 - COURT.wall.z0; // 12
-const SIDE_W = (COURT.wall.x1 - COURT.door.half); // 后墙门洞旁每侧墙宽的一半跨度
+// 心境映射（四档必须可感知且不崩）：绕「冷灰绿天光 × 暖纸灯（恒定暖）」摆动雾/雨/醇度。
+interface MoodCfg {
+  bg: string;
+  fogColor: string;
+  fogDensity: number;
+  ambClr: string;
+  ambInt: number;
+  hemi: number;
+  key: number;
+  keyClr: string;
+  rain: number;
+  rainVol: number;
+  windVol: number;
+  lampMul: number;
+  mist: string;
+}
+const COURT_MOOD: Record<string, MoodCfg> = {
+  rainy: { bg: "#8b948d", fogColor: "#88918a", fogDensity: 0.052, ambClr: "#6d7a72", ambInt: 0.42, hemi: 0.52, key: 0.42, keyClr: "#aebcb2", rain: 1.0, rainVol: 0.5, windVol: 0.2, lampMul: 1.0, mist: "#93a09a" },
+  cool: { bg: "#96a099", fogColor: "#909a92", fogDensity: 0.04, ambClr: "#71807a", ambInt: 0.48, hemi: 0.58, key: 0.55, keyClr: "#b4c2b8", rain: 0.6, rainVol: 0.34, windVol: 0.26, lampMul: 0.9, mist: "#9aa7a0" },
+  warm: { bg: "#a2a897", fogColor: "#9aa091", fogDensity: 0.028, ambClr: "#83826d", ambInt: 0.52, hemi: 0.6, key: 0.62, keyClr: "#c8c6a8", rain: 0.3, rainVol: 0.22, windVol: 0.3, lampMul: 1.28, mist: "#a6ad9c" },
+  neutral: { bg: "#98a09a", fogColor: "#929a93", fogDensity: 0.036, ambClr: "#77837c", ambInt: 0.5, hemi: 0.57, key: 0.56, keyClr: "#b8c2ba", rain: 0.5, rainVol: 0.3, windVol: 0.26, lampMul: 1.05, mist: "#9ca89f" },
+};
 
-export default function CourtyardStage(_props: { low: boolean }) {
+const ZONE_BODY: Record<ZoneType, (p: { zone: Zone; low?: boolean }) => React.JSX.Element> = {
+  bookshelf: CourtyardBookshelf,
+  objects: CourtyardObjectShelf,
+  record: Guqin,
+};
+
+export default function CourtyardStage({ low }: { low: boolean }) {
   const zones = useWorld((s) => s.world.zones);
-  const back = COURT.wall.z0;
+  const mood = useWorld((s) => s.world.room.mood.lighting);
+  const cfg = COURT_MOOD[mood] ?? COURT_MOOD.rainy;
+
+  // 声床：雨打瓦 + 竹叶风（两层叠加）+ 古琴（随 musicPlaying）。
+  useCourtyardAudio(cfg.rainVol, cfg.windVol);
+
+  const eaveY = Y_STUDY + STUDY.wallH; // 檐口高度参考
+
   return (
     <>
-      <color attach="background" args={["#aeb7b2"]} />
-      {/* 晨雾：山居的"雾"。标准材质吃雾（地面/墙），天空是纯色背景不受影响 */}
-      <fogExp2 attach="fog" args={["#c2ccc6", 0.05]} />
+      <color attach="background" args={[cfg.bg]} />
+      {/* 雾三层之近层：FogExp2（灰绿）——近清晰、中景褪色。天空/水池/远山/雾墙各自 fog=false 不受它。 */}
+      <fogExp2 attach="fog" args={[cfg.fogColor, cfg.fogDensity]} />
 
-      {/* 光：清晨漫射，够看清 */}
-      <ambientLight intensity={0.7} color="#c8d0cc" />
-      <hemisphereLight args={["#dfe6e2", "#4a5048", 0.8]} />
-      <directionalLight position={[3, 6, 4]} intensity={0.9} color="#f0efe6" castShadow />
+      {/* 天光：阴天黄昏级冷灰绿（环境 + 半球 + 一盏冷向光主投影） */}
+      <ambientLight intensity={cfg.ambInt} color={cfg.ambClr} />
+      <hemisphereLight args={["#aeb8b0", "#3a4038", cfg.hemi]} />
+      <directionalLight
+        position={[5, 9, 6]}
+        intensity={cfg.key}
+        color={cfg.keyClr}
+        castShadow={!low}
+        shadow-mapSize-width={low ? 512 : 1024}
+        shadow-mapSize-height={low ? 512 : 1024}
+        shadow-camera-left={-10}
+        shadow-camera-right={10}
+        shadow-camera-top={10}
+        shadow-camera-bottom={-10}
+        shadow-camera-near={0.5}
+        shadow-camera-far={40}
+        shadow-bias={-0.0006}
+        shadow-normalBias={0.03}
+      />
 
-      {/* 平地 */}
-      <mesh position={[0, -0.05, 0]} rotation={[0, 0, 0]} receiveShadow>
-        <boxGeometry args={[COURT.wall.x1 - COURT.wall.x0, 0.1, WALL_LEN]} />
-        <meshStandardMaterial color="#3a4038" roughness={0.95} />
-      </mesh>
+      {/* 围墙外的远方：中景雾墙 + 三层远山剪影 */}
+      <Backdrop mistColor={cfg.mist} low={low} />
 
-      {/* 后墙 + 门洞：门洞两侧各一段墙 + 上方门楣，中间留空可穿过 */}
-      <mesh position={[-(COURT.door.half + SIDE_W / 2), 1.3, back]} receiveShadow>
-        <boxGeometry args={[SIDE_W, 2.6, 0.2]} />
-        <meshStandardMaterial color="#4a504a" roughness={0.9} />
-      </mesh>
-      <mesh position={[COURT.door.half + SIDE_W / 2, 1.3, back]} receiveShadow>
-        <boxGeometry args={[SIDE_W, 2.6, 0.2]} />
-        <meshStandardMaterial color="#4a504a" roughness={0.9} />
-      </mesh>
-      {/* 门楣 */}
-      <mesh position={[0, COURT.door.height + 0.15, back]}>
-        <boxGeometry args={[COURT.door.half * 2 + 0.2, 0.3, 0.24]} />
-        <meshStandardMaterial color="#5a5248" roughness={0.85} />
-      </mesh>
-      {/* 门洞两侧立柱（与 walk 碰撞一致） */}
-      <mesh position={[-COURT.door.half, 1.3, back + 0.05]} castShadow>
-        <boxGeometry args={[0.28, 2.6, 0.28]} />
-        <meshStandardMaterial color="#52493f" roughness={0.85} />
-      </mesh>
-      <mesh position={[COURT.door.half, 1.3, back + 0.05]} castShadow>
-        <boxGeometry args={[0.28, 2.6, 0.28]} />
-        <meshStandardMaterial color="#52493f" roughness={0.85} />
-      </mesh>
+      {/* 建筑外壳（围墙 + 月洞门 + 石径 + 书房 + 石阶）+ 竹 + 松石 */}
+      <Shell />
+      <Bamboo low={low} />
+      <Garden low={low} />
 
-      {/* 两侧矮墙（廊下感） */}
-      <mesh position={[COURT.wall.x0, 0.6, 0]} receiveShadow>
-        <boxGeometry args={[0.2, 1.2, WALL_LEN]} />
-        <meshStandardMaterial color="#454b45" roughness={0.9} />
-      </mesh>
-      <mesh position={[COURT.wall.x1, 0.6, 0]} receiveShadow>
-        <boxGeometry args={[0.2, 1.2, WALL_LEN]} />
-        <meshStandardMaterial color="#454b45" roughness={0.9} />
-      </mesh>
+      {/* 浅水池（深墨绿静水 + 雨涟漪） */}
+      <Pool rain={cfg.rain} low={low} />
 
-      {/* 三个 zone 占位物（数据驱动） */}
-      {zones.map((zone) => (
-        <PlaceholderZone key={zone.id} zone={zone} />
-      ))}
+      {/* 细雨 + 檐口滴水线 */}
+      <Rain rain={cfg.rain} low={low} />
+
+      {/* 纸灯：庭院檐口一盏（全场唯一暖点，低亮度，雾里晕开） */}
+      <PaperLantern position={[1.85, eaveY - 0.35, STUDY.zFront + 0.06]} intensity={3.4} distance={4.0} scale={1.0} mul={cfg.lampMul} low={low} />
+      {/* 书房内一盏（屋内主暖光，把矮几浸暖、透过格窗渗出「屋里暖」） */}
+      <PaperLantern position={[0, Y_STUDY + STUDY.wallH - 0.5, -4.7]} intensity={3.6} distance={3.8} scale={0.95} mul={cfg.lampMul} low={low} />
+
+      {/* 三个数据驱动 zone（按 type 分发；内容过滤/聚焦/登记全用 zone.id） */}
+      {zones.map((zone) => {
+        const Body = ZONE_BODY[zone.type];
+        return Body ? <Body key={zone.id} zone={zone} low={low} /> : null;
+      })}
     </>
   );
 }
