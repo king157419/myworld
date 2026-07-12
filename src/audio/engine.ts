@@ -116,6 +116,9 @@ export class AudioEngine {
   // —— 环境水声总线（全局）——
   private waterSource: AudioBufferSourceNode | null = null;
   private waterGain!: GainNode;
+  /** 水声默认增益（loft 的镜面水床）。 */
+  readonly baseWaterGain = 0.22;
+  private waterVol = 0.22;
 
   // —— 雷声所需噪声缓冲（轻量，本地合成）——
   private noiseBuf: AudioBuffer | null = null;
@@ -159,7 +162,7 @@ export class AudioEngine {
 
     // —— 环境水声总线（全局，进 master）——
     this.waterGain = ctx.createGain();
-    this.waterGain.gain.value = 0.22;
+    this.waterGain.gain.value = this.waterVol;
     this.waterGain.connect(this.master);
 
     // —— 音乐总线（→ PannerNode @ GRAMOPHONE → master）——
@@ -310,6 +313,18 @@ export class AudioEngine {
     const t = this.ctx.currentTime;
     this.musicBus.gain.cancelScheduledValues(t);
     this.musicBus.gain.setTargetAtTime(on ? 1 : 0, t, on ? 0.4 : 0.6);
+  }
+
+  /**
+   * 调节环境水声增益（渐变）。多场景架构下：进入非水场景（如雨夜阁楼）时把 loft 的水床压到 0，
+   * 离场恢复到 baseWaterGain。是「切场景切换环境声」的最小接口（不重构引擎；正式的按场景床/曲库下一轮）。
+   */
+  setWaterGain(v: number, ramp = 0.6): void {
+    this.waterVol = v;
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this.waterGain.gain.cancelScheduledValues(t);
+    this.waterGain.gain.setTargetAtTime(v, t, ramp);
   }
 
   /** 全局静音 / 取消静音。 */

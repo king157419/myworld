@@ -31,7 +31,8 @@ describe("store.switchScene：多场景往返不串不丢", () => {
     // attic 只有它自己的种子，绝无 loft 那条。
     expect(afterAttic.entries.some((e) => e.id === loftEntry.id)).toBe(false);
     expect(afterAttic.entries.length).toBeGreaterThan(0);
-    expect(afterAttic.entries.every((e) => e.id.startsWith("attic-seed-"))).toBe(true);
+    // 印记正式稿种子 id 形如 attic-t1 / attic-o1 / attic-r1（都以 attic- 起头）。
+    expect(afterAttic.entries.every((e) => e.id.startsWith("attic-"))).toBe(true);
 
     // 3) 在 attic 写一条内容。
     const atticEntry = useWorld.getState().addEntry({ zoneId: "zone-objects", type: "object", title: "attic 的物件", body: "只属于 attic" });
@@ -42,7 +43,7 @@ describe("store.switchScene：多场景往返不串不丢", () => {
     expect(backLoft.world.room.style).toBe("loft");
     expect(backLoft.entries.some((e) => e.id === loftEntry.id)).toBe(true);
     expect(backLoft.entries.some((e) => e.id === atticEntry.id)).toBe(false);
-    expect(backLoft.entries.some((e) => e.id.startsWith("attic-seed-"))).toBe(false);
+    expect(backLoft.entries.some((e) => e.id.startsWith("attic-"))).toBe(false);
 
     // 5) 再切到 attic：attic 的种子 + 第 3 步写的那条都在（持久化了、没丢）。
     await useWorld.getState().switchScene("attic");
