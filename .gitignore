@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# ????????????(MANIFEST ??)
+.omx/
+_staging/*
+!_staging/audio
+_staging/audio/*
+!_staging/audio/MANIFEST.md
