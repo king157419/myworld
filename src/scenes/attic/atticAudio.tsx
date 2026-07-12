@@ -1,8 +1,10 @@
 import { useEffect, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useAudio } from "../../audio/useAudio";
-import { TRACKS, type TrackMeta } from "../../audio/engine";
+import { audioEngine, TRACKS, type TrackMeta } from "../../audio/engine";
+import { GRAMOPHONE } from "../../theme";
 import { useWorld } from "../../store/useWorld";
+import { SPOT } from "./data";
 
 // 雨夜阁楼的声音接线（上一 wave 留下的收尾）：
 //   1) 唱机曲库换成三首 Kevin MacLeod 爵士（CC BY 4.0，署名见 public/audio/CREDITS.md）——
@@ -25,12 +27,19 @@ export const ATTIC_TRACKS: TrackMeta[] = [
   { id: "jazz-backbay-lounge", title: "Backbay Lounge", sub: "Kevin MacLeod (incompetech.com) · CC BY 4.0", file: "attic/jazz-backbay-lounge.mp3" },
 ];
 
-/** 进 attic → 唱机曲库切爵士；离场（Stage 卸载）→ 恢复 loft 默认夜曲。 */
+// 唱机的空间化锚点（世界坐标）：黑胶角 SPOT.record 上唱机箱体处，走近才变响。
+const ATTIC_MUSIC_POS: [number, number, number] = [SPOT.record[0], SPOT.record[1] + 0.86, SPOT.record[2]];
+
+/** 进 attic → 唱机曲库切爵士 + 空间化到唱机位；离场（Stage 卸载）→ 恢复 loft 默认夜曲 + 留声机位。 */
 export function useAtticLibrary(): void {
   const setLibrary = useAudio((s) => s.setLibrary);
   useEffect(() => {
     setLibrary(ATTIC_TRACKS);
-    return () => setLibrary(TRACKS);
+    audioEngine.setMusicPosition(ATTIC_MUSIC_POS);
+    return () => {
+      setLibrary(TRACKS);
+      audioEngine.setMusicPosition(GRAMOPHONE);
+    };
   }, [setLibrary]);
 }
 

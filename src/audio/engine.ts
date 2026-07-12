@@ -109,6 +109,8 @@ export class AudioEngine {
   private musicSource: AudioBufferSourceNode | null = null;
   // 当前曲库（按场景可换：loft 夜曲 = 默认 TRACKS / attic 爵士）。loft 从不调用 setLibrary → 恒为 TRACKS。
   private library: TrackMeta[] = TRACKS;
+  // 音乐空间化锚点（留声机/唱机所在世界坐标）。默认 loft 的 GRAMOPHONE；attic 换到唱机位。
+  private musicPos: Vec = GRAMOPHONE;
   private trackData: (ArrayBuffer | null)[] = []; // null = 未加载或永久坏轨
   private decoded = new Map<number, AudioBuffer>();
   private playSeq = 0; // 播放请求令牌：快速连点切歌时只有最后一次生效
@@ -170,7 +172,7 @@ export class AudioEngine {
     // —— 音乐总线（→ PannerNode @ GRAMOPHONE → master）——
     this.musicBus = ctx.createGain();
     this.musicBus.gain.value = 0; // 默认静音，setMusicPlaying(true) 后渐起
-    this.musicPanner = makePanner(ctx, GRAMOPHONE);
+    this.musicPanner = makePanner(ctx, this.musicPos);
     this.musicBus.connect(this.musicPanner).connect(this.master);
 
     // 异步加载音频，不 await（不阻塞 start() 返回，加载完成后自动开始播放）
@@ -301,6 +303,13 @@ export class AudioEngine {
       this.musicBus.gain.cancelScheduledValues(this.ctx.currentTime);
       this.musicBus.gain.setTargetAtTime(1, this.ctx.currentTime, 0.4);
     }
+  }
+
+  /** 设音乐空间化锚点（留声机/唱机世界坐标）。按场景切换：loft 默认 GRAMOPHONE / attic 唱机位。
+   *  未 start 时先记下，start() 建 panner 时采用；loft 不调用 → 恒在 GRAMOPHONE。 */
+  setMusicPosition(pos: Vec): void {
+    this.musicPos = pos;
+    if (this.ctx && this.musicPanner) setPannerPos(this.musicPanner, pos[0], pos[1], pos[2], this.ctx.currentTime);
   }
 
   /** 点选某曲目播放（i 越界忽略）。落到哪一首以 onTrackChange 回报为准（坏轨会向后跳）。 */
