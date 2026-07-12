@@ -49,6 +49,7 @@ export default function PlayerControls() {
   const exitActive = useRef(false);
   const exitAccum = useRef(0); // 退出缓动累计时长（超时兜底交还控制）
   const prevFocused = useRef<string | null>(null); // 帧内检测聚焦进/出（消除 effect 竞态）
+  const initedStyle = useRef<string | null>(null); // 已按哪个场景初始化过出生点（帧内判定，消除 effect 竞态）
 
   // 指针锁定下按主键：准心命中且够得着 → 聚焦该区。
   const { yaw, pitch, keys, joy } = useWalkInput(gl.domElement, () => {
@@ -69,17 +70,9 @@ export default function PlayerControls() {
     camera.rotation.order = "YXZ";
   }, [camera]);
 
-  // 场景切换：把玩家瞬移到目标场景的出生点。PlayerControls 不随 Stage 重挂载（它是 Experience 的
-  // 常驻子节点），故在此响应 style 变化。入场电影已结束（introDone），这里只做瞬移、不重播。
-  useEffect(() => {
-    const sd = SCENE_DATA[resolveScene(style)];
-    const [sx, , sz] = sd.spawn.position;
-    feet.current.set(sx, sd.walk(0, sx, sz, sx, sz).y, sz);
-    yaw.current = sd.spawn.yaw;
-    pitch.current = -0.04;
-    vel.current.set(0, 0);
-    bobAmp.current = 0;
-  }, [style, yaw, pitch]);
+  // 首帧 / 切场景的出生点初始化改到帧循环里（见 useFrame 顶部的 initedStyle 守卫）：
+  // 用帧内读到的 live 场景数据判定，而不是 React effect——effect 的时序在"直接启动即 attic"时
+  // 会漏掉出生点初始化（玩家曾停在 loft 旧坐标、门厅界外悬空）。loft 直接启动行为不变。
 
   // 聚焦进/出由帧循环检测调用（不放 effect——effect 晚一帧会让漫游分支先把相机跳回脚步位，
   // 那正是"退出没有动画"的根因）。这里只算好目标位姿/快照，实际缓动在帧里做。
@@ -133,6 +126,19 @@ export default function PlayerControls() {
     // live 场景数据（与 s 同源，切场景当帧即一致）：出生点/视高/行走求解器/是否有水。
     const sd = SCENE_DATA[resolveScene(s.world.room.style)];
     const spawn = sd.spawn.position;
+
+    // ── 首帧 / 切场景：把玩家瞬移到"当前场景"的出生点（用 live sd 判定，race-proof）──
+    //   直接启动即 attic 时，effect 版会漏掉初始化 → 玩家停在 loft 旧坐标悬空；这里首帧即按场景落位。
+    //   loft 直接启动：首帧 initedStyle=null≠"loft" 同样瞬移到 loft 出生点，行为不变。
+    if (initedStyle.current !== sd.style) {
+      initedStyle.current = sd.style;
+      const [ix, , iz] = spawn;
+      feet.current.set(ix, sd.walk(0, ix, iz, ix, iz).y, iz);
+      yaw.current = sd.spawn.yaw;
+      pitch.current = -0.04;
+      vel.current.set(0, 0);
+      bobAmp.current = 0;
+    }
 
     // ── 聚焦进/出转场：帧内检测（在一切分支之前），消除 effect 晚一帧导致的"直接跳转" ──
     if (s.focusedZoneId !== prevFocused.current) {

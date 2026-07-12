@@ -46,3 +46,38 @@ the recordings below are each PD or CC0.
 - **Performer**: Robin Alciatore (via Musopen)
 - **License**: Public Domain
 - **Source**: https://commons.wikimedia.org/wiki/File:Erik_Satie_-_gymnopedies_-_la_1_ere._lent_et_douloureux.ogg
+
+## 场景 A · 雨夜阁楼（attic/）
+
+阁楼唱机的曲库（爵士）与环境/彩蛋音效，离线打包在 `public/audio/attic/`。
+
+### attic/rain-interior.mp3
+
+- **Title**: 关窗室内听大雨（rain, indoor, window）
+- **Author**: Chris.sonido.peru (Freesound)
+- **License**: CC0 1.0 (Public Domain Dedication)
+- **Source**: https://freesound.org/people/Chris.sonido.peru/sounds/855890/
+
+### attic/jazz-late-night-radio.mp3 · attic/jazz-sidewalk-shade.mp3 · attic/jazz-backbay-lounge.mp3
+
+- **Titles**: "Late Night Radio", "Sidewalk Shade", "Backbay Lounge"
+- **Author**: Kevin MacLeod (incompetech.com)
+- **License**: Creative Commons Attribution 4.0 (CC BY 4.0) — https://creativecommons.org/licenses/by/4.0/
+- **Required attribution** (incompetech FAQ format):
+  - "Late Night Radio" Kevin MacLeod (incompetech.com) — Licensed under Creative Commons: By Attribution 4.0 — https://creativecommons.org/licenses/by/4.0/
+  - "Sidewalk Shade" Kevin MacLeod (incompetech.com) — Licensed under Creative Commons: By Attribution 4.0 — https://creativecommons.org/licenses/by/4.0/
+  - "Backbay Lounge" Kevin MacLeod (incompetech.com) — Licensed under Creative Commons: By Attribution 4.0 — https://creativecommons.org/licenses/by/4.0/
+
+### attic/vinyl-crackle.mp3
+
+- **Title**: Vinyl crackle loop（黑胶底噪）
+- **Author**: DefySolipsis (Freesound)
+- **License**: CC0 1.0 (Public Domain Dedication)
+- **Source**: https://freesound.org/people/DefySolipsis/sounds/531438/
+
+### attic/floor-creak-single.mp3
+
+- **Title**: Wooden floor creak, single（木地板吱呀单音）
+- **Author**: Rudmer_Rotteveel (Freesound)
+- **License**: CC0 1.0 (Public Domain Dedication)
+- **Source**: https://freesound.org/people/Rudmer_Rotteveel/sounds/506665/

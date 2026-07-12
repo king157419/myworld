@@ -68,8 +68,10 @@ export default function Stairs() {
 
       {/* 楼梯间壁灯（墙 x1 一侧，半坡高度）：给上楼一路暖引 */}
       <Sconce position={[x1 - 0.09, Y_ATTIC * 0.55 + 1.2, (zBot + zTop) / 2 + 0.4]} ry={-Math.PI / 2} />
-      {/* 顶端一颗极短距暖溢光（阁楼入口处的门槛暖意），不投影 */}
-      <pointLight position={[0, Y_ATTIC + 0.4, zTop + 0.3]} color={ATTIC_PALETTE.lampWarm} intensity={1.4} distance={2.8} decay={2} />
+      {/* 顶端暖溢光（阁楼入口处的门槛暖意，牵引视线上楼），不投影——强度/半径调足让梯口明确 */}
+      <pointLight position={[0, Y_ATTIC + 0.4, zTop + 0.3]} color={ATTIC_PALETTE.lampWarm} intensity={2.4} distance={3.8} decay={2} />
+      {/* 楼梯下段暖补光（门厅侧）：让底部几级踏步从门厅望去能读出"这是楼梯"（评审 F5），不投影 */}
+      <pointLight position={[0, 1.0, zBot - 0.7]} color={ATTIC_PALETTE.lampWarm} intensity={1.6} distance={3.4} decay={2} />
     </group>
   );
 }

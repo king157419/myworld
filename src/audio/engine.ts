@@ -107,6 +107,8 @@ export class AudioEngine {
   private musicBus!: GainNode;
   private musicPanner!: PannerNode;
   private musicSource: AudioBufferSourceNode | null = null;
+  // 当前曲库（按场景可换：loft 夜曲 = 默认 TRACKS / attic 爵士）。loft 从不调用 setLibrary → 恒为 TRACKS。
+  private library: TrackMeta[] = TRACKS;
   private trackData: (ArrayBuffer | null)[] = []; // null = 未加载或永久坏轨
   private decoded = new Map<number, AudioBuffer>();
   private playSeq = 0; // 播放请求令牌：快速连点切歌时只有最后一次生效
@@ -185,8 +187,11 @@ export class AudioEngine {
       if (buf && this.ctx) this.startWaterLoop(this.ctx, buf);
     });
 
-    // —— 曲库：只拉压缩字节，PCM 播放时按需解码 ——
-    this.trackData = await Promise.all(TRACKS.map((t) => fetchBytes(audioUrl(t.file))));
+    // —— 曲库：只拉压缩字节，PCM 播放时按需解码（用当前 library：可能已被场景切成爵士）——
+    const lib = this.library;
+    const data = await Promise.all(lib.map((t) => fetchBytes(audioUrl(t.file))));
+    if (this.library !== lib) return; // start 期间又切了库：让 setLibrary 负责起播
+    this.trackData = data;
     await this.playFrom(this.currentIndex);
     if (this.musicOn) {
       this.musicBus.gain.cancelScheduledValues(ctx.currentTime);
@@ -221,7 +226,7 @@ export class AudioEngine {
       this.decoded.set(i, buf);
       return buf;
     } catch (e) {
-      console.warn("[AudioEngine] 曲目解码失败，标记坏轨:", TRACKS[i]?.file, e);
+      console.warn("[AudioEngine] 曲目解码失败，标记坏轨:", this.library[i]?.file, e);
       this.trackData[i] = null; // 永久坏轨：以后直接跳过
       return null;
     }
@@ -239,11 +244,12 @@ export class AudioEngine {
    * 之前坏轨会静默停摆，而引擎和 UI 都还声称"正在播放"（两份真相分道扬镳）。
    */
   private async playFrom(start: number): Promise<void> {
-    if (!this.ctx) { this.currentIndex = ((start % TRACKS.length) + TRACKS.length) % TRACKS.length; return; }
+    const N = this.library.length;
+    if (!this.ctx || N === 0) { this.currentIndex = N ? ((start % N) + N) % N : 0; return; }
     const seq = ++this.playSeq;
     this.stopSource();
-    for (let hop = 0; hop < TRACKS.length; hop++) {
-      const i = (((start + hop) % TRACKS.length) + TRACKS.length) % TRACKS.length;
+    for (let hop = 0; hop < N; hop++) {
+      const i = (((start + hop) % N) + N) % N;
       const buf = await this.decodeTrack(i);
       if (seq !== this.playSeq) return; // 等解码期间来了新的播放请求：让位
       if (!buf) continue;
@@ -257,7 +263,7 @@ export class AudioEngine {
       this.musicSource = src;
       this.onTrackChange?.(i, this.musicOn);
       // 预解码下一首、释放更早的 PCM
-      const next = (i + 1) % TRACKS.length;
+      const next = (i + 1) % N;
       this.pruneDecoded([i, next]);
       void this.decodeTrack(next);
       return;
@@ -268,18 +274,42 @@ export class AudioEngine {
   }
 
   // ── 曲库控制 ──────────────────────────────────────────────────────────
-  get trackList(): TrackMeta[] { return TRACKS; }
+  get trackList(): TrackMeta[] { return this.library; }
   get currentTrack(): number { return this.currentIndex; }
   /** 换曲/坏轨跳过/全库失败时回调：(落到的曲目下标, 是否可听)。 */
   setOnTrackChange(cb: (i: number, audible: boolean) => void): void { this.onTrackChange = cb; }
 
+  /**
+   * 切换当前曲库（按场景：loft 夜曲=默认 TRACKS / attic 爵士）。同库引用即空操作；
+   * loft 从不调用 → 曲库行为零变化。最小加性接口：复用既有按需解码 / 自动接续 / 坏轨跳过 /
+   * 空间化留声机，只把 library 换一份并从头起播。未 start 时只记下，start() 会用最新 library。
+   */
+  async setLibrary(tracks: TrackMeta[]): Promise<void> {
+    if (tracks === this.library) return;
+    this.library = tracks;
+    this.decoded.clear();
+    this.trackData = [];
+    this.currentIndex = 0;
+    if (!this.ctx) return; // 尚未 start：loadAndPlay 会用最新 library 起播
+    const seq = ++this.playSeq; // 作废在途播放/解码
+    this.stopSource();
+    const data = await Promise.all(tracks.map((t) => fetchBytes(audioUrl(t.file))));
+    if (seq !== this.playSeq || this.library !== tracks) return; // 期间又切库/切歌：让位
+    this.trackData = data;
+    await this.playFrom(0);
+    if (this.musicOn && this.ctx) {
+      this.musicBus.gain.cancelScheduledValues(this.ctx.currentTime);
+      this.musicBus.gain.setTargetAtTime(1, this.ctx.currentTime, 0.4);
+    }
+  }
+
   /** 点选某曲目播放（i 越界忽略）。落到哪一首以 onTrackChange 回报为准（坏轨会向后跳）。 */
   playTrack(i: number): void {
-    if (i < 0 || i >= TRACKS.length) return;
+    if (i < 0 || i >= this.library.length) return;
     void this.playFrom(i);
   }
   next(): void { void this.playFrom(this.currentIndex + 1); }
-  prev(): void { void this.playFrom(this.currentIndex - 1 + TRACKS.length); }
+  prev(): void { void this.playFrom(this.currentIndex - 1 + this.library.length); }
 
   // ── 远雷（雨夜心境下由 Atmosphere.DistantThunder 随机间隔调用） ───────
 

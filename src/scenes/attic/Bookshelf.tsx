@@ -31,12 +31,12 @@ interface Placed {
   c: THREE.Color;
 }
 
-// 一整面书墙的书：沿几层横板铺陈，逐格不规则节奏。返回 (装饰书, 可点亮候选位).
+// 一整面书墙的书：沿几层横板铺陈，逐格不规则节奏。返回 (装饰书, 可点亮候选位含各自书脊色).
 function buildBooks() {
   const rand = seededRng(4715);
   const boards = [3.25, 3.85, 4.45, 5.05, 5.65]; // 横板 y 位（越高越短，随山墙收窄）
   const decor: Placed[] = [];
-  const litSpots: { x: number; y: number }[] = [];
+  const litSpots: { x: number; y: number; c: THREE.Color }[] = [];
   const aged = new THREE.Color("#241c16");
   const pick = () => new THREE.Color(BOOK_COLORS[Math.floor(rand() * BOOK_COLORS.length)]).lerp(aged, 0.2 + rand() * 0.18);
 
@@ -59,6 +59,7 @@ function buildBooks() {
         if (cursor + pileW > xR) break;
         const pileN = 2 + (rand() < 0.4 ? 1 : 0);
         let py = by + 0.03;
+        let topC = new THREE.Color();
         for (let p = 0; p < pileN; p++) {
           const th = 0.035 + rand() * 0.02;
           const m = new THREE.Matrix4().compose(
@@ -66,10 +67,11 @@ function buildBooks() {
             new THREE.Quaternion(),
             new THREE.Vector3(pileW, th, 0.17 + rand() * 0.05),
           );
-          decor.push({ m, c: pick() });
+          topC = pick();
+          decor.push({ m, c: topC });
           py += th;
         }
-        litSpots.push({ x: cursor + pileW / 2, y: py + 0.03 });
+        litSpots.push({ x: cursor + pileW / 2, y: py + 0.03, c: topC });
         cursor += pileW + 0.02;
         continue;
       }
@@ -80,13 +82,14 @@ function buildBooks() {
       const h = Math.max(0.22, Math.min(0.24 + rand() * 0.26, maxH));
       const tilt = rand() < 0.12 ? (rand() - 0.5) * 0.28 : 0;
       const depth = 0.17 + rand() * 0.07;
+      const vC = pick();
       const m = new THREE.Matrix4().compose(
         new THREE.Vector3(cursor + w / 2, by + h / 2 + 0.02, BOOK_Z),
         new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, tilt)),
         new THREE.Vector3(w, h, depth),
       );
-      decor.push({ m, c: pick() });
-      litSpots.push({ x: cursor + w / 2, y: by + h / 2 + 0.02 });
+      decor.push({ m, c: vC });
+      litSpots.push({ x: cursor + w / 2, y: by + h / 2 + 0.02, c: vC });
       cursor += w + 0.012;
     }
   }
@@ -168,8 +171,10 @@ export default function AtticBookshelf({ zone, low = false }: { zone: Zone; low?
       lit.forEach((s, i) => {
         m.compose(new THREE.Vector3(s.x, s.y, BOOK_Z + 0.03), new THREE.Quaternion(), new THREE.Vector3(0.05, 0.2, 0.16));
         mesh.setMatrixAt(i, m);
+        mesh.setColorAt(i, s.c); // 点亮书脊取书本自身低饱和色（暖光晕来自 emissive）——不是纯白灯管
       });
       mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     },
     [lit],
   );
@@ -204,11 +209,13 @@ export default function AtticBookshelf({ zone, low = false }: { zone: Zone; low?
         {/* 点亮的书脊（思考驱动，暖琥珀自发光） */}
         {lit.length > 0 && (
           <instancedMesh ref={litCb} args={[spineGeom, undefined, lit.length]} frustumCulled={false}>
+            {/* 点亮书脊：书本自身色（instanceColor）+ 收敛的暖琥珀 emissive——"书脊在发微光"而非灯管（评审 F6，参照 loft 0.35） */}
             <meshStandardMaterial
-              color={ATTIC_PALETTE.paperWarm}
+              color={"#ffffff"}
               emissive={new THREE.Color(ATTIC_PALETTE.glowAmber)}
-              emissiveIntensity={0.5}
-              roughness={0.7}
+              emissiveIntensity={0.32}
+              roughness={0.72}
+              metalness={0.03}
               toneMapped={false}
             />
           </instancedMesh>
@@ -266,7 +273,7 @@ export default function AtticBookshelf({ zone, low = false }: { zone: Zone; low?
           <mesh position={[0, 0.16, 0]} material={brassMat} castShadow>
             <cylinderGeometry args={[0.014, 0.02, 0.32, 10]} />
           </mesh>
-          <WarmLamp position={[0.03, 0.4, 0.02]} intensity={6.2} distance={3.0} scale={0.62} castShadow={!low} low={low} />
+          <WarmLamp position={[0.03, 0.4, 0.02]} intensity={4.1} distance={2.8} scale={0.62} castShadow={!low} low={low} />
         </group>
         {/* 台脚边一小摞没放回去的书 */}
         {[0, 1, 2].map((i) => (

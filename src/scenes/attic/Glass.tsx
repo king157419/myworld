@@ -2,13 +2,17 @@ import { useMemo } from "react";
 import * as THREE from "three";
 import { GlowSprite } from "../../scene/gallery/glow";
 import { ATTIC_PALETTE } from "./materials";
-import { glassVert } from "./rainGlass";
+import { glassVert, makeNightSkyMaterial } from "./rainGlass";
 
-// 窗上的雨（满分锚点 ref_rain_window_night_6）：玻璃上可辨认的单颗水珠 + 缓慢下滑的拉丝，
-// 珠子边缘被室内暖灯催出高光、玻璃底色是青蓝夜——冷底暖斑。窗外还看得见雨丝落下。
-// v1 全程序化 shader，零贴图、离线自给。玻璃材质工厂在 rainGlass.ts（本文件只做组件 + 雨丝层）。
+// 窗上的雨（满分锚点 ref_rain_window_night_6）：玻璃上小而密、大小混杂的水珠（实心亮点+暗边缘）+
+// 偶发 2-3 条蜿蜒下滑的拉丝；窗外是暗蓝灰的夜（云渐变、非发光蓝屏），远灯化成极小的暖 bokeh。
+// v1 全程序化 shader，零贴图、离线自给。玻璃 + 夜空面材质工厂在 rainGlass.ts（本文件只做组件 + 雨丝层）。
 
-// 窗外雨丝：一层滚动竖直短线，透过玻璃可见。
+// 窗外夜空的暗蓝灰（比旧版纯蓝暗 ~4×，去 LED 感；上深下略提亮）。
+const SKY_TOP = "#070a11";
+const SKY_BOT = "#0d1119";
+
+// 窗外雨丝：一层稀疏、几乎不可见的细短下坠（只作"外面在下雨"的暗示，不再是满屏竖条纹）。
 const rainVert = glassVert;
 const rainFrag = /* glsl */ `
   precision highp float;
@@ -18,17 +22,17 @@ const rainFrag = /* glsl */ `
   float h(vec2 p){ return fract(sin(dot(p,vec2(41.3,289.1)))*43758.5); }
   void main(){
     vec2 uv = vUv;
-    float cols = 46.0;
+    float cols = 20.0;
     float col = floor(uv.x*cols);
     float fx = fract(uv.x*cols);
     float rnd = h(vec2(col, 3.0));
-    float on = step(0.45, h(vec2(col,7.0)));
-    float speed = 0.7 + rnd*1.1;
-    float y = fract(uv.y*2.2 - uTime*speed - rnd*7.0);
-    float dash = smoothstep(0.5,0.5-0.16, abs(y-0.5));
-    float thin = smoothstep(0.5,0.0, abs(fx-0.5));
-    float a = on*dash*thin*0.22*uRain;
-    gl_FragColor = vec4(vec3(0.72,0.8,1.0), a);
+    float on = step(0.72, h(vec2(col,7.0)));   // 稀疏：仅少数列有雨丝
+    float speed = 0.8 + rnd*1.1;
+    float y = fract(uv.y*3.0 - uTime*speed - rnd*7.0);
+    float dash = smoothstep(0.5,0.5-0.08, abs(y-0.5)); // 短段（非满屏直条）
+    float thin = smoothstep(0.35,0.0, abs(fx-0.5));
+    float a = on*dash*thin*0.06*uRain;                 // 几乎不可见
+    gl_FragColor = vec4(vec3(0.66,0.75,0.92), a);
   }
 `;
 
@@ -45,7 +49,7 @@ function makeRainOutsideMaterial(rainUniform: { value: number }, timeUniform: { 
   });
 }
 
-/** 天窗：屋顶斜面上开的一扇（含窗框 + 雨蚀玻璃 + 窗外冷夜 + 一层雨丝）。 */
+/** 天窗：屋顶斜面上开的一扇（含窗框 + 雨蚀玻璃 + 窗外暗夜 + 一层雨丝 + 一两点远处暖 bokeh）。 */
 export function Skylight({
   material,
   rainUniform,
@@ -66,14 +70,17 @@ export function Skylight({
   low?: boolean;
 }) {
   const rainMat = useMemo(() => makeRainOutsideMaterial(rainUniform, timeUniform), [rainUniform, timeUniform]);
+  const skyMat = useMemo(() => makeNightSkyMaterial(timeUniform, SKY_TOP, SKY_BOT), [timeUniform]);
   const [w, h] = size;
   return (
     <group position={position} rotation={rotation}>
-      {/* 天窗外的夜天（微亮的冷云，让天窗透出冷光；浅偏移，紧贴玻璃后免被屋顶挡掉） */}
-      <mesh position={[0, 0, -0.05]}>
+      {/* 天窗外的暗夜天（云渐变，暗蓝灰；紧贴玻璃后免被屋顶挡掉） */}
+      <mesh position={[0, 0, -0.05]} material={skyMat}>
         <planeGeometry args={[w * 1.1, h * 1.1]} />
-        <meshBasicMaterial color={"#2a3a5c"} toneMapped={false} />
       </mesh>
+      {/* 远处一两点暖 bokeh（讲故事的远灯，极小、低透明） */}
+      <GlowSprite position={[-0.28, 0.22, -0.045]} color={"#ffbe73"} scale={0.16} opacity={0.24} />
+      <GlowSprite position={[0.24, -0.18, -0.045]} color={"#ffd39a"} scale={0.12} opacity={0.18} />
       {/* 窗外冷光源：透过天窗打进屋里的清冷天光（不投影）。low 档减灯：只留自发光冷夜面，省一盏点光 */}
       {!low && <pointLight position={[0, 0, -0.35]} color={"#7f97c4"} intensity={2.2 * coldMul} distance={5} decay={2} />}
       {/* 一层雨丝 */}
@@ -99,7 +106,7 @@ export function Skylight({
   );
 }
 
-/** 山墙窗（写字台前）：雨蚀玻璃 + 冷夜 + 远处暖色 bokeh 斑 + 雨丝。 */
+/** 山墙窗（写字台前）：雨蚀玻璃 + 暗夜 + 远处暖色 bokeh 斑 + 雨丝。 */
 export function GableWindow({
   material,
   rainUniform,
@@ -118,23 +125,17 @@ export function GableWindow({
   coldMul?: number;
 }) {
   const rainMat = useMemo(() => makeRainOutsideMaterial(rainUniform, timeUniform), [rainUniform, timeUniform]);
+  const skyMat = useMemo(() => makeNightSkyMaterial(timeUniform, SKY_TOP, SKY_BOT), [timeUniform]);
   const [w, h] = size;
   return (
     <group position={position} rotation={rotation}>
-      {/* 冷夜底（浅偏移，紧贴玻璃后免被山墙挡掉） */}
-      <mesh position={[0, 0, -0.075]}>
+      {/* 暗夜底（云渐变；紧贴玻璃后免被山墙挡掉） */}
+      <mesh position={[0, 0, -0.075]} material={skyMat}>
         <planeGeometry args={[w * 1.1, h * 1.1]} />
-        <meshBasicMaterial color={ATTIC_PALETTE.nightCold} toneMapped={false} />
       </mesh>
-      {/* 远灯化成的暖色 bokeh（冷底暖斑）——低不透明、离散几点 */}
-      {[
-        [-0.5, -0.35, "#ffb257", 0.5],
-        [0.42, -0.1, "#ffcf8a", 0.36],
-        [0.12, 0.4, "#ff9b46", 0.3],
-        [-0.3, 0.28, "#ffd9a0", 0.26],
-      ].map((b, i) => (
-        <GlowSprite key={i} position={[b[0] as number, b[1] as number, -0.055]} color={b[2] as string} scale={0.42} opacity={b[3] as number} />
-      ))}
+      {/* 远灯化成的暖色 bokeh（冷底暖斑）——收到 1~2 点、极小、低透明（不再一堆大斑） */}
+      <GlowSprite position={[-0.42, -0.28, -0.055]} color={"#ffbe73"} scale={0.2} opacity={0.26} />
+      <GlowSprite position={[0.34, 0.12, -0.055]} color={"#ffd39a"} scale={0.14} opacity={0.18} />
       {/* 雨丝 */}
       <mesh position={[0, 0, -0.035]} material={rainMat}>
         <planeGeometry args={[w, h]} />

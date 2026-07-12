@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import * as THREE from "three";
 import { ATTIC, EAVE_H, HALF_W, RIDGE_H, Y_ATTIC } from "./data";
-import { ATTIC_PALETTE, beamMat, floorMat, plasterMat, woodWarmMat } from "./materials";
+import { ATTIC_PALETTE, floorMat, plasterMat, roofBeamMat, woodWarmMat } from "./materials";
 
 // 老宅外壳：门厅（y=0）+ 木楼梯井 + 阁楼主间（双坡人字顶）。三段依坡而建、越往里越高。
 // 几何全部由 data.ts 的常量派生（walk 碰撞读同一份 → 看到的墙就是挡路的墙）。
@@ -118,12 +118,14 @@ export default function Shell() {
         <sphereGeometry args={[0.035, 12, 10]} />
         <meshStandardMaterial color={ATTIC_PALETTE.brass} roughness={0.35} metalness={1} />
       </mesh>
-      {/* 门上气窗：透进一线冷光（半透冷玻璃 + 一盏冷补光） */}
+      {/* 门上气窗：透进一线冷光（半透冷玻璃 + 一盏冷补光）——提亮到实际可见（评审 F5） */}
       <mesh position={[0, entry.door.top + 0.16, entry.z1 - 0.02]}>
         <planeGeometry args={[entry.door.half * 2, 0.24]} />
-        <meshBasicMaterial color={ATTIC_PALETTE.glassCold} transparent opacity={0.85} toneMapped={false} />
+        <meshBasicMaterial color={"#4a638c"} transparent opacity={0.95} toneMapped={false} />
       </mesh>
-      <pointLight position={[0, entry.door.top + 0.1, entry.z1 - 0.5]} color={"#8ba2cc"} intensity={1.8} distance={4.2} decay={2} />
+      <pointLight position={[0, entry.door.top + 0.1, entry.z1 - 0.5]} color={"#8ba2cc"} intensity={3.4} distance={5.2} decay={2} />
+      {/* 门厅极低暖顶光：把"这是门厅"从纯黑里托出一层（仍昏暗、仍被楼上暖光牵引） */}
+      <pointLight position={[0.3, 2.35, (entry.z0 + entry.z1) / 2 + 0.3]} color={ATTIC_PALETTE.lampWarm} intensity={1.3} distance={5.0} decay={2} />
 
       {/* ───────── 楼梯井 ───────── */}
       {/* 侧墙（沿 z，覆盖上升段；高度给足） */}
@@ -143,18 +145,29 @@ export default function Shell() {
       <mesh geometry={roof} receiveShadow>
         <meshStandardMaterial color={ATTIC_PALETTE.plaster} roughness={0.95} side={THREE.DoubleSide} />
       </mesh>
-      {/* 屋脊梁 + 几道椽（暖木，接灯光时读出屋架） */}
-      <mesh position={[0, ridgeY - 0.12, (room.z0 + room.z1) / 2]} material={beamMat}>
+      {/* 屋脊梁 + 几道椽（暖深木 roofBeamMat：受光 + 一点自发光地板，不塌成纯黑贴片） */}
+      <mesh position={[0, ridgeY - 0.12, (room.z0 + room.z1) / 2]} material={roofBeamMat}>
         <boxGeometry args={[0.16, 0.22, room.z1 - room.z0]} />
       </mesh>
       {Array.from({ length: 6 }).map((_, i) => {
         const z = room.z0 + 0.9 + (i / 5) * (room.z1 - room.z0 - 1.8);
         return (
-          <mesh key={i} position={[0, (ridgeY + eaveY) / 2 - 0.05, z]} material={beamMat}>
+          <mesh key={i} position={[0, (ridgeY + eaveY) / 2 - 0.05, z]} material={roofBeamMat}>
             <boxGeometry args={[HALF_W * 2 - 0.1, 0.1, 0.12]} />
           </mesh>
         );
       })}
+      {/* 屋脊暖余晖：两盏极低强度不投影暖光沿脊线，只把梁下缘与人字顶轻轻托起（不打散墙角的暗） */}
+      {[0.32, 0.68].map((t, i) => (
+        <pointLight
+          key={i}
+          position={[0, ridgeY - 0.5, room.z0 + t * (room.z1 - room.z0)]}
+          color={ATTIC_PALETTE.lampWarm}
+          intensity={0.9}
+          distance={4.6}
+          decay={2}
+        />
+      ))}
       {/* 山墙：远端（书墙侧，实墙）+ 近端（楼梯到达口，留门洞） */}
       <Gable z={room.z0} />
       <Gable z={room.z1} opening={{ half: 1.3, top: Y_ATTIC + 2.1 }} />

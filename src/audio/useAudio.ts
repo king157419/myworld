@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { audioEngine } from "./engine";
+import { audioEngine, type TrackMeta } from "./engine";
 
 // 声场的 UI 状态（瞬态，不持久化）。与世界 store 解耦，避免把 AudioContext 引入
 // 数据层 / 单测。引擎持有真实音频图；这里只镜像可见状态供 UI 订阅。
@@ -26,6 +26,8 @@ interface AudioState {
   /** 下一首 / 上一首。 */
   nextTrack: () => void;
   prevTrack: () => void;
+  /** 按场景切换曲库（loft 夜曲 / attic 爵士）：同步 UI 曲目单 + 引擎换库起播。 */
+  setLibrary: (tracks: TrackMeta[]) => void;
 }
 
 export const useAudio = create<AudioState>((set, get) => ({
@@ -78,6 +80,13 @@ export const useAudio = create<AudioState>((set, get) => ({
     audioEngine.setMusicPlaying(true);
     set({ musicPlaying: true });
     audioEngine.prev();
+  },
+
+  // 曲库随场景切换。立即镜像 UI 曲目单（RecordPanel 的"曲目单"跟着变），引擎异步换库起播；
+  // 换库后落到哪一首由 onTrackChange 回报。已在同一库时引擎侧空操作。
+  setLibrary: (tracks) => {
+    set({ tracks: tracks.map((t) => ({ id: t.id, title: t.title, sub: t.sub })), currentTrack: 0 });
+    void audioEngine.setLibrary(tracks);
   },
 }));
 

@@ -20,6 +20,15 @@ export const ATTIC_PALETTE = {
 /** 深旧木：屋架 / 椽 / 书架框。 */
 export const beamMat = new THREE.MeshStandardMaterial({ color: ATTIC_PALETTE.woodDark, roughness: 0.9 });
 
+/** 屋顶横梁 / 椽：暖的深旧木 + 一点自发光地板——夜里挂在天花上也不塌成纯黑贴片，
+ *  梁下缘能接住灯光余晖（评审 F3：横梁曾是零光照响应的黑胶带）。 */
+export const roofBeamMat = new THREE.MeshStandardMaterial({
+  color: "#4a3623",
+  roughness: 0.82,
+  emissive: new THREE.Color(ATTIC_PALETTE.woodWarm),
+  emissiveIntensity: 0.08,
+});
+
 /** 暖木：接灯光的木件（写字台 / 楼梯踏板 / 层板）。 */
 export const woodWarmMat = new THREE.MeshStandardMaterial({ color: ATTIC_PALETTE.woodWarm, roughness: 0.72, metalness: 0.04 });
 

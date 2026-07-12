@@ -13,6 +13,7 @@ import AtticRecordCorner from "./RecordCorner";
 import { GableWindow, Skylight } from "./Glass";
 import { makeRainGlassMaterial } from "./rainGlass";
 import { useAtticRain } from "./useAtticRain";
+import { StairCreak, useAtticLibrary, useVinylCrackle } from "./atticAudio";
 import { ATTIC_PALETTE } from "./materials";
 
 // 雨夜阁楼 · v1 成品舞台。
@@ -125,6 +126,9 @@ export default function AtticStage({ low }: { low: boolean }) {
 
   // 室内雨声床（随 useAudio.started 起停 + 压掉 loft 水床；音量随心境）。
   useAtticRain(cfg.rainVol);
+  // 唱机曲库切爵士（离场恢复 loft）+ musicPlaying 时叠黑胶底噪。
+  useAtticLibrary();
+  useVinylCrackle();
 
   // 天窗定向（两坡各一，错开 Z）。
   const ePlus = useMemo(() => slopeEuler(+1), []);
@@ -142,7 +146,8 @@ export default function AtticStage({ low }: { low: boolean }) {
 
       {/* 全局环境：压到极低——灯潭之间必须沉暗（洇开的前提） */}
       <ambientLight intensity={cfg.ambInt} color={cfg.ambClr} />
-      <hemisphereLight args={["#2a3448", "#0a0805", cfg.hemi]} />
+      {/* 地色略暖（不再纯黑）：向下的面（梁下缘/檐下）接住一点暖余晖，避免塌成黑贴片 */}
+      <hemisphereLight args={["#2a3448", "#15100a", cfg.hemi]} />
 
       {/* 建筑外壳 + 楼梯 */}
       <Shell />
@@ -172,14 +177,16 @@ export default function AtticStage({ low }: { low: boolean }) {
             <meshStandardMaterial color={ATTIC_PALETTE.woodDark} roughness={0.85} />
           </mesh>
         ))}
-        {/* 小暖灯：门厅唯一暖光，只亮边桌一圈 */}
+        {/* 小暖灯：门厅主暖光，灯潭稍扩，把门厅从纯黑里托出（评审 F5，仍昏暗） */}
         <mesh position={[0, 0.62, 0]}>
           <sphereGeometry args={[0.05, 14, 10]} />
           <meshStandardMaterial color={ATTIC_PALETTE.lampCore} emissive={new THREE.Color(ATTIC_PALETTE.lampWarm)} emissiveIntensity={1.5} roughness={0.5} toneMapped={false} />
         </mesh>
-        <pointLight position={[0, 0.62, 0]} color={ATTIC_PALETTE.lampWarm} intensity={4.2} distance={3.0} decay={2} />
+        <pointLight position={[0, 0.62, 0]} color={ATTIC_PALETTE.lampWarm} intensity={5.6} distance={3.9} decay={2} />
       </group>
 
+      {/* 第七级楼梯吱呀（印记 attic-t5 彩蛋） */}
+      <StairCreak />
       {/* 灯边微尘 */}
       {!low && <DustMotes />}
       {/* 雨夜远雷 */}
