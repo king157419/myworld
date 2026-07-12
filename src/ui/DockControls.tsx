@@ -4,6 +4,7 @@ import { useWorld } from "../store/useWorld";
 import { useAudio } from "../audio/useAudio";
 import { persistNow } from "../data/db";
 import { downloadWorld, parseSavedWorld, ImportError } from "../data/io";
+import { SCENE_DATA, SCENE_ORDER } from "../scenes/registryData";
 
 // 底部控制簇 · 版权页条（仅漫游态）：黑胶播放/切歌、声音、心境、最近/导出/导入。
 // 心境表单源在 config/moods.ts（Lighting/Atmosphere 消费同一份，按钮不是视觉空操作）。
@@ -14,6 +15,8 @@ export default function DockControls({ onToggleRecent }: { onToggleRecent: () =>
   const entries = useWorld((s) => s.entries);
   const setMood = useWorld((s) => s.setMood);
   const hydrate = useWorld((s) => s.hydrate);
+  const style = useWorld((s) => s.world.room.style);
+  const switchScene = useWorld((s) => s.switchScene);
 
   const musicPlaying = useAudio((s) => s.musicPlaying);
   const toggleMusic = useAudio((s) => s.toggleMusic);
@@ -51,6 +54,24 @@ export default function DockControls({ onToggleRecent }: { onToggleRecent: () =>
   return (
     <>
       <div className="dock-controls" role="toolbar" aria-label="播放与心境控制">
+        {/* 场景切换：三座内心世界（当前高亮）。切换会刷盘当前场景、加载目标场景各自的世界。 */}
+        <span className="mood-eyebrow" aria-hidden>场景</span>
+        <div className="moods" role="group" aria-label="场景切换">
+          {SCENE_ORDER.map((sc) => (
+            <button
+              key={sc}
+              className={`chip${style === sc ? " active" : ""}`}
+              aria-pressed={style === sc}
+              title={SCENE_DATA[sc].tagline}
+              onClick={() => void switchScene(sc)}
+            >
+              {SCENE_DATA[sc].label}
+            </button>
+          ))}
+        </div>
+
+        <span className="ctl-divider" aria-hidden />
+
         {/* 黑胶播放/暂停 */}
         <button
           className={`ctl${musicPlaying ? " on" : ""}`}

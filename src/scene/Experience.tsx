@@ -2,16 +2,9 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { PerformanceMonitor } from "@react-three/drei";
 import * as THREE from "three";
-import Lighting from "./Lighting";
-import Sky from "./Sky";
-import Vista from "./Vista";
-import Water from "./Water";
-import Gallery from "./gallery";
-import Atmosphere from "./Atmosphere";
-import Zones from "./zones/Zones";
-import SunkenThoughts from "./SunkenThoughts";
 import PlayerControls from "./PlayerControls";
 import PostFX from "./PostFX";
+import { SCENES, resolveScene } from "../scenes/registry";
 import { useWorld } from "../store/useWorld";
 import { useAudio } from "../audio/useAudio";
 
@@ -72,6 +65,11 @@ export default function Experience() {
   const [low, setLow] = useState(lowStart.current);
   const [dpr, setDpr] = useState(1); // 保守起步，由 PerformanceMonitor 视余量爬升（drei 推荐：低起、有余量再升）
 
+  // 当前场景由 world.room.style 决定：从注册表取该场景的 Stage（全部 3D 内容）。
+  // key={style} 强制切换时整棵子树重挂载，旧场景干净卸载（interactables 自动注销、灯/RT 释放）。
+  const style = useWorld((s) => s.world.room.style);
+  const Stage = SCENES[resolveScene(style)].Stage;
+
   return (
     <Canvas
       shadows
@@ -98,14 +96,7 @@ export default function Experience() {
         onIncline={() => setDpr((d) => Math.min(low ? 1 : 1.5, Math.max(d, 1)))}
       />
       <Suspense fallback={null}>
-        <Sky />
-        <Vista />
-        <Lighting low={low} />
-        <Gallery low={low} />
-        <Water low={low} />
-        <Atmosphere />
-        <SunkenThoughts />
-        <Zones />
+        <Stage key={style} low={low} />
       </Suspense>
       <PlayerControls />
       <PostFX low={low} />

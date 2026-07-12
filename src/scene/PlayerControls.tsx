@@ -2,13 +2,12 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { useWorld } from "../store/useWorld";
-import { resolveMove } from "./walk";
 import { interactableObjs, zoneIdOf } from "./interactables";
 import { spawnRipple } from "./ripples";
 import { useWalkInput } from "./input";
 import { computeFocusPoseClear, dampPose } from "./cameraDirector";
 import { syncAudioListener } from "./audioListener";
-import { EYE, FOCUS, SPAWN, ZONE_ANCHORS } from "../theme";
+import { SCENE_DATA, resolveScene } from "../scenes/registryData";
 
 // 第一人称控制器：帧循环状态机（顺序即优先级）——
 //   聚焦进/出检测 → ① 入场前环绕 → ② 入场电影 → ③ 聚焦定格 → ④ 退出回程 → ⑤ 漫游。
@@ -29,7 +28,12 @@ export default function PlayerControls() {
   const { camera, gl, clock, scene } = useThree();
   const focusZone = useWorld((s) => s.focusZone);
 
-  const feet = useRef(new THREE.Vector3(SPAWN[0], 0, SPAWN[2]));
+  // 当前场景数据（出生点/视高/行走求解器/锚点/聚焦/是否有水）——经注册表取，不再直接 import theme。
+  // 切场景时 style 变 → sceneData 变；hot loop 里的闭包每帧取最新 render 的 sceneData。
+  const style = useWorld((s) => s.world.room.style);
+  const sceneData = SCENE_DATA[resolveScene(style)];
+
+  const feet = useRef(new THREE.Vector3(sceneData.spawn.position[0], 0, sceneData.spawn.position[2]));
   const vel = useRef(new THREE.Vector2(0, 0)); // 水平速度（惯性状态）：起步/停步有质量感
   const bobAmp = useRef(0); // 步伐幅度包络（走↔停平滑过渡，不硬切）
   const bob = useRef(0);
@@ -65,6 +69,18 @@ export default function PlayerControls() {
     camera.rotation.order = "YXZ";
   }, [camera]);
 
+  // 场景切换：把玩家瞬移到目标场景的出生点。PlayerControls 不随 Stage 重挂载（它是 Experience 的
+  // 常驻子节点），故在此响应 style 变化。入场电影已结束（introDone），这里只做瞬移、不重播。
+  useEffect(() => {
+    const sd = SCENE_DATA[resolveScene(style)];
+    const [sx, , sz] = sd.spawn.position;
+    feet.current.set(sx, sd.walk(0, sx, sz, sx, sz).y, sz);
+    yaw.current = sd.spawn.yaw;
+    pitch.current = -0.04;
+    vel.current.set(0, 0);
+    bobAmp.current = 0;
+  }, [style, yaw, pitch]);
+
   // 聚焦进/出由帧循环检测调用（不放 effect——effect 晚一帧会让漫游分支先把相机跳回脚步位，
   // 那正是"退出没有动画"的根因）。这里只算好目标位姿/快照，实际缓动在帧里做。
   const beginFocus = useCallback((id: string) => {
@@ -72,9 +88,12 @@ export default function PlayerControls() {
     document.exitPointerLock?.();
 
     // 锚点按 zone.type 解析（id 是用户数据，导入的世界可改名）；查无此区回退持久化 zone.position。
-    const zone = useWorld.getState().world.zones.find((z) => z.id === id);
-    const f = zone ? FOCUS[zone.type] : undefined;
-    const a = zone ? ZONE_ANCHORS[zone.type] : undefined;
+    // 取"当前场景"的聚焦数据（live 读 getState，避免闭包里拿到旧场景的锚点）。
+    const st = useWorld.getState();
+    const sd = SCENE_DATA[resolveScene(st.world.room.style)];
+    const zone = st.world.zones.find((z) => z.id === id);
+    const f = zone ? sd.focus[zone.type] : undefined;
+    const a = zone ? sd.zoneAnchors[zone.type] : undefined;
     const p = zone?.position;
     center.set(
       f ? f.center[0] : a ? a.position[0] : p ? p[0] : 0,
@@ -111,6 +130,9 @@ export default function PlayerControls() {
     if (import.meta.env.DEV && (window as unknown as { __freecam?: boolean }).__freecam) return;
     const dt = Math.min(dtRaw, 0.05);
     const s = useWorld.getState();
+    // live 场景数据（与 s 同源，切场景当帧即一致）：出生点/视高/行走求解器/是否有水。
+    const sd = SCENE_DATA[resolveScene(s.world.room.style)];
+    const spawn = sd.spawn.position;
 
     // ── 聚焦进/出转场：帧内检测（在一切分支之前），消除 effect 晚一帧导致的"直接跳转" ──
     if (s.focusedZoneId !== prevFocused.current) {
@@ -138,23 +160,23 @@ export default function PlayerControls() {
         const x = Math.min(1, e / INTRO_DUR);
         const k = x * x * x * (x * (x * 6 - 15) + 10); // smootherstep
         camera.position.set(
-          THREE.MathUtils.lerp(introFrom.current.x, SPAWN[0], k),
-          THREE.MathUtils.lerp(introFrom.current.y, EYE, k) + Math.sin(e * 0.6) * 0.04,
-          THREE.MathUtils.lerp(introFrom.current.z, SPAWN[2], k),
+          THREE.MathUtils.lerp(introFrom.current.x, spawn[0], k),
+          THREE.MathUtils.lerp(introFrom.current.y, sd.eye, k) + Math.sin(e * 0.6) * 0.04,
+          THREE.MathUtils.lerp(introFrom.current.z, spawn[2], k),
         );
         camera.lookAt(0, THREE.MathUtils.lerp(1.0, 1.1, k), THREE.MathUtils.lerp(-2.8, -3.6, k));
-        // 临近水面时，脚下荡开第一圈涟漪——"原来我站在星海上"。
-        if (!introRipple.current && e > INTRO_DUR * 0.6) {
+        // 临近水面时，脚下荡开第一圈涟漪——"原来我站在星海上"（仅有水场景）。
+        if (sd.water && !introRipple.current && e > INTRO_DUR * 0.6) {
           introRipple.current = true;
-          spawnRipple(SPAWN[0], SPAWN[2], clock.elapsedTime, 1.3);
+          spawnRipple(spawn[0], spawn[2], clock.elapsedTime, 1.3);
         }
         syncAudioListener(camera);
         return;
       }
       // 收尾：对齐漫游状态到落点，交还控制
       introDone.current = true;
-      feet.current.set(SPAWN[0], 0, SPAWN[2]);
-      yaw.current = 0;
+      feet.current.set(spawn[0], 0, spawn[2]);
+      yaw.current = sd.spawn.yaw;
       pitch.current = -0.04;
     }
 
@@ -167,7 +189,7 @@ export default function PlayerControls() {
 
     // ── ④ 退出聚焦：指数阻尼飞回漫游位姿，到位（或超时兜底）再交还控制 ──
     if (exitActive.current && snapshot.current) {
-      exitPos.set(snapshot.current.x, snapshot.current.y + EYE, snapshot.current.z);
+      exitPos.set(snapshot.current.x, snapshot.current.y + sd.eye, snapshot.current.z);
       tmpEuler.set(snapshot.current.pitch, snapshot.current.yaw, 0);
       exitQ.setFromEuler(tmpEuler);
       dampPose(camera, exitPos, exitQ, dt);
@@ -208,7 +230,7 @@ export default function PlayerControls() {
     const speedNow = Math.hypot(vel.current.x, vel.current.y);
     const moving = speedNow > 0.15;
 
-    const res = resolveMove(
+    const res = sd.walk(
       feet.current.y,
       feet.current.x,
       feet.current.z,
@@ -242,7 +264,7 @@ export default function PlayerControls() {
 
     // 脚步涟漪：走在水面（脚下高度≈0）时，每跨过一步距离就在星海倒影上荡开一圈。
     // 1.2 单位一圈 ≈ 3.6/秒：慢于环形缓冲的覆盖速度，扩散中的环能完整放完（否则看着"抽搐"）。
-    if (moving && feet.current.y < 0.18) {
+    if (sd.water && moving && feet.current.y < 0.18) {
       rippleAccum.current += speedNow * dt;
       if (rippleAccum.current > 1.2) {
         rippleAccum.current = 0;
@@ -252,7 +274,7 @@ export default function PlayerControls() {
 
     // 相机坐落在脚步上；转头/俯仰仍 1:1 即时（加平滑=黄油感延迟，不做）。
     // 横向摇以"肩部小平移"实现（沿相机右向），比 roll 倾斜更不晕。
-    camera.position.set(feet.current.x, feet.current.y + EYE + headbob, feet.current.z);
+    camera.position.set(feet.current.x, feet.current.y + sd.eye + headbob, feet.current.z);
     camera.rotation.set(pitch.current, yaw.current, 0);
     if (bobAmp.current > 0.01) {
       camera.position.x += Math.cos(yaw.current) * sway;

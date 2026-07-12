@@ -12,8 +12,15 @@ export type Vec3 = [number, number, number];
 
 // 联合类型一律由 const 数组派生：io.ts 校验直接复用同一份数组，加一个成员只改这一处。
 
-/** 房间风格。MVP 只实现 loft，但类型预留其余以便"生长"。 */
-export const ROOM_STYLES = ["loft", "study", "courtyard"] as const;
+/**
+ * 房间风格 = 场景选择器（每个 style 是一个独立世界 / 一座可走进去的场景）。
+ *   loft      = 潮汐图书馆（历史名保持；旧存档的 style 就是 loft，零迁移）
+ *   attic     = 雨夜阁楼（占位舞台，后续轮建成品）
+ *   courtyard = 雾中山居（占位舞台，后续轮建成品）
+ *   study     = 预留，未接场景
+ * io.ts 的守门与此同源：数组放宽一个成员，导入校验自动跟随。
+ */
+export const ROOM_STYLES = ["loft", "attic", "courtyard", "study"] as const;
 export type RoomStyle = (typeof ROOM_STYLES)[number];
 
 /** 心境：驱动光照 / 天气 / 配色。MVP 由用户手选，后期可由 AI / 内容聚合推导。 */

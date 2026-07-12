@@ -1,7 +1,8 @@
 import { create } from "zustand";
-import type { Entry, WorldConfig } from "../config/types";
+import type { Entry, RoomStyle, WorldConfig } from "../config/types";
 import { defaultWorld } from "../config/defaultWorld";
-import { saveDebounced } from "../data/db";
+import { flushSave, loadWorld, persistNow, saveDebounced } from "../data/db";
+import { SCENE_DATA, resolveScene } from "../scenes/registryData";
 
 // 唯一真相源。渲染层只订阅、不直接改世界结构；所有写入走这些 action。
 // 每次改动后防抖落盘——刷新页面世界依然在。
@@ -38,6 +39,10 @@ interface WorldState {
 
   // —— 世界结构（MVP 仅心境会改）——
   setMood: (mood: WorldConfig["room"]["mood"]) => void;
+
+  // —— 场景切换（多场景架构）——
+  /** 切到另一个场景：刷盘当前 → 加载目标（无则种子+落盘）→ hydrate → 清 focus/hover。 */
+  switchScene: (style: RoomStyle) => Promise<void>;
 
   // —— 启动 / 导入时整体替换 ——
   hydrate: (world: WorldConfig, entries: Entry[]) => void;
@@ -106,6 +111,25 @@ export const useWorld = create<WorldState>((set, get) => ({
   setMood: (mood) => {
     set((s) => ({ world: { ...touchWorld(s.world, Date.now()), room: { ...s.world.room, mood } } }));
     persist(get);
+  },
+
+  switchScene: async (style) => {
+    const target = resolveScene(style);
+    if (get().world.room.style === target) return;
+    // 先把当前场景挂起的防抖写入刷盘（否则切走后它才触发，会写进错的场景快照？——不会：
+    // 快照自带 world.room.style，落到正确场景；但仍要 flush 以免丢最近改动）。
+    await flushSave();
+    const loaded = await loadWorld(target);
+    if (loaded.world) {
+      get().hydrate(loaded.world, loaded.entries);
+    } else {
+      // 首次进入该场景：注入种子并落盘一次。
+      const def = SCENE_DATA[target].defaultWorld;
+      const seed = SCENE_DATA[target].makeSeed(Date.now());
+      get().hydrate(def, seed);
+      await persistNow(def, seed);
+    }
+    // hydrate 已清 focus/hover。TODO(下一轮)：切场景时按目标场景切换水声/曲库配置（audio/engine）。
   },
 
   hydrate: (world, entries) =>

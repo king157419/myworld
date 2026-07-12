@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import { useWorld } from "../store/useWorld";
-import { flushSave, loadWorld, persistNow } from "../data/db";
-import { defaultWorld } from "../config/defaultWorld";
-import { makeSeed } from "../data/seed";
+import { flushSave, loadWorld, persistNow, readLastScene } from "../data/db";
+import { SCENE_DATA, resolveScene } from "../scenes/registryData";
 
 /**
- * 启动路径：从 IndexedDB 读出世界；没有则用 defaultWorld（store 初值）。
- * 返回 ready，避免在水合完成前渲染出"默认世界一闪"。
+ * 启动路径：读 meta.lastScene（无则 loft）→ 加载该场景的世界；没有则用该场景的
+ * defaultWorld + 种子并落盘一次。返回 ready，避免在水合完成前渲染出"默认世界一闪"。
  */
 export function usePersistence(): boolean {
   const [ready, setReady] = useState(false);
@@ -16,15 +15,17 @@ export function usePersistence(): boolean {
     let cancelled = false;
     void (async () => {
       try {
-        const { world, entries } = await loadWorld();
+        const style = resolveScene((await readLastScene()) ?? "loft");
+        const { world, entries } = await loadWorld(style);
         if (cancelled) return;
         if (world) {
           hydrate(world, entries);
         } else {
-          // 世界从未保存过：注入"已住很久"的种子内容并落盘一次。
-          const seed = makeSeed(Date.now());
-          hydrate(defaultWorld, seed);
-          await persistNow(defaultWorld, seed);
+          // 该场景从未保存过：注入种子内容并落盘一次。
+          const def = SCENE_DATA[style].defaultWorld;
+          const seed = SCENE_DATA[style].makeSeed(Date.now());
+          hydrate(def, seed);
+          await persistNow(def, seed);
         }
       } catch (err) {
         console.error("[lingjing] 读取本地世界失败，使用默认世界：", err);

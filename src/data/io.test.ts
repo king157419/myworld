@@ -42,6 +42,14 @@ describe("io: 导出再导入完整复现", () => {
     expect(obj?.primitive).toBe("box");
     expect(obj?.color).toBe("#334455");
   });
+
+  it("accepts the new scene styles (attic / courtyard)（守门随 ROOM_STYLES 同源放宽）", () => {
+    for (const style of ["attic", "courtyard"] as const) {
+      const world = { ...defaultWorld, room: { ...defaultWorld.room, style } };
+      const json = serializeWorld(world, [], 1);
+      expect(parseSavedWorld(json).world.room.style).toBe(style);
+    }
+  });
 });
 
 describe("io: 非法输入被拒绝（守门）", () => {
