@@ -47,15 +47,15 @@ export default function AtticRecordCorner({ zone, low = false }: { zone: Zone; l
       <mesh position={[0, 0.4, 0]} material={woodWarmMat} castShadow receiveShadow>
         <boxGeometry args={[1.5, 0.8, 0.6]} />
       </mesh>
-      {/* 柜面唱机箱体（提亮箱体色，让它接得住暖光——评审 F4 曾整体死黑） */}
+      {/* 柜面唱机箱体（再提亮一档箱体色，让它接得住暖光——评审 R12·A1 仍吞光） */}
       <mesh position={[0, 0.86, -0.02]} castShadow>
         <boxGeometry args={[0.62, 0.12, 0.5]} />
-        <meshStandardMaterial color={"#2c2118"} roughness={0.5} metalness={0.1} />
+        <meshStandardMaterial color={"#3d2d1d"} roughness={0.5} metalness={0.1} emissive={new THREE.Color("#1a1108")} emissiveIntensity={0.14} />
       </mesh>
       {/* 唱盘（金属，掠射灯光下有沟纹反光）；无环境贴图故降金属度，靠直接光出高光而非塌黑 */}
       <mesh position={[-0.04, 0.93, -0.02]}>
         <cylinderGeometry args={[0.2, 0.2, 0.02, 40]} />
-        <meshStandardMaterial color={"#43434a"} roughness={0.3} metalness={0.45} emissive={new THREE.Color("#1a140c")} emissiveIntensity={0.25} />
+        <meshStandardMaterial color={"#54545c"} roughness={0.24} metalness={0.5} emissive={new THREE.Color("#241a10")} emissiveIntensity={0.3} />
       </mesh>
       {/* 旋转黑胶（播放时飞转）：降金属度 + 一点自发光，暗部沉成深褐而非纯黑 */}
       <mesh ref={disc} position={[-0.04, 0.945, -0.02]} castShadow>
@@ -80,10 +80,10 @@ export default function AtticRecordCorner({ zone, low = false }: { zone: Zone; l
         </mesh>
       ))}
 
-      {/* 矮身暖壁灯（贴柜面，把黑胶角浸在暖光里；短距，只亮这一角）——提亮让唱机与封套读得出（评审 F4） */}
-      <WarmLamp position={[0.66, 1.02, 0.12]} intensity={6.0} distance={3.4} scale={0.6} low={low} />
-      {/* 唱机补光（无投影，只照唱机本体一圈）：金属件出锐利暖高光、暗部沉褐；不打散墙角的暗 */}
-      <pointLight userData={{ ljBake: "content" }} position={[0.16, 1.24, 0.16]} color={ATTIC_PALETTE.lampCore} intensity={2.6} distance={1.7} decay={2} />
+      {/* 矮身暖壁灯（贴柜面，把黑胶角浸在暖光里；短距，只亮这一角）——壁灯下移贴近机身，主光角度确保打到金属件（评审 R12·A1） */}
+      <WarmLamp position={[0.6, 0.98, 0.16]} intensity={6.0} distance={3.4} scale={0.6} low={low} />
+      {/* 唱机掠射补光（无投影，只照唱机本体一圈）：从机身前上方掠过，金属件出锐利暖高光、暗部沉褐；不打散墙角的暗 */}
+      <pointLight userData={{ ljBake: "content" }} position={[0.1, 1.12, 0.34]} color={ATTIC_PALETTE.lampCore} intensity={3.4} distance={2.0} decay={2} />
       {/* 播放时的内容灯（随播放态变强，短距） */}
       <pointLight userData={{ ljBake: "content" }} position={[0, 1.15, 0.1]} color={ATTIC_PALETTE.lampWarm} intensity={playing ? 3.4 : 2.0} distance={3.0} decay={2} />
 

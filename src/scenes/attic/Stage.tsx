@@ -48,6 +48,22 @@ const ZONE_BODY: Record<ZoneType, (p: { zone: Zone; low?: boolean }) => React.JS
   record: AtticRecordCorner,
 };
 
+/** 圆形软边尘埃贴图（canvas 径向渐变）：近看不再是白方块（评审 R12·A3）。 */
+function dustSpriteTexture(): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = c.height = 32;
+  const ctx = c.getContext("2d")!;
+  const g = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+  g.addColorStop(0, "rgba(255,255,255,1)");
+  g.addColorStop(0.4, "rgba(255,255,255,0.55)");
+  g.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 32, 32);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 /** 灯边微尘：极轻的暖色悬浮尘（单 Points，一处 useFrame）。 */
 function DustMotes() {
   const ref = useRef<THREE.Points>(null);
@@ -64,7 +80,8 @@ function DustMotes() {
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
     g.setAttribute("aSpd", new THREE.BufferAttribute(spd, 1));
-    const m = new THREE.PointsMaterial({ size: 0.02, color: new THREE.Color("#ffdca8"), transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true, toneMapped: false });
+    // 圆形软边贴图 → 近处不读作方块；略缩小 + 降不透明度，避免抢戏。
+    const m = new THREE.PointsMaterial({ size: 0.03, map: dustSpriteTexture(), color: new THREE.Color("#ffdca8"), transparent: true, opacity: 0.42, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true, toneMapped: false });
     return { geom: g, mat: m };
   }, []);
   useFrame((s, dt) => {

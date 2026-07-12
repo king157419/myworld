@@ -26,7 +26,9 @@ const matCache = new Map<string, THREE.MeshStandardMaterial>();
 function objMat(color: string): THREE.MeshStandardMaterial {
   let m = matCache.get(color);
   if (!m) {
-    m = new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.15, emissive: new THREE.Color(color), emissiveIntensity: 0.12 });
+    // 评审 R12·A2：套书脊 F6 修法——物件保留自身颜色，emissive 换成收敛的琥珀（不是自色白光），
+    // 浅色物件（琴谱/票根）才不会被自发白光顶成「灯箱」。
+    m = new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.1, emissive: new THREE.Color(ATTIC_PALETTE.glowAmber), emissiveIntensity: 0.14 });
     matCache.set(color, m);
   }
   return m;
@@ -85,9 +87,9 @@ export default function AtticObjectShelf({ zone, low = false }: { zone: Zone; lo
         );
       })}
 
-      {/* 檐下矮暖灯（短距，只把陈列一带浸暖） */}
-      <WarmLamp position={[0.62, 1.28, 0.1]} intensity={4.0} distance={2.7} scale={0.55} low={low} />
-      <pointLight userData={{ ljBake: "content" }} position={[0, 1.3, 0.1]} color={ATTIC_PALETTE.lampWarm} intensity={1.4} distance={2.6} decay={2} />
+      {/* 檐下矮暖灯（短距，只把陈列一带浸暖）——收敛光强，浅色物件读作暖奶白而非曝白灯箱（评审 R12·A2） */}
+      <WarmLamp position={[0.62, 1.28, 0.1]} intensity={3.2} distance={2.7} scale={0.55} low={low} />
+      <pointLight userData={{ ljBake: "content" }} position={[0, 1.3, 0.1]} color={ATTIC_PALETTE.lampWarm} intensity={1.0} distance={2.6} decay={2} />
 
       {/* 碰撞盒 */}
       <mesh visible={false} position={[0, 0.8, 0]}>
