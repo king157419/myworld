@@ -23,9 +23,14 @@
 按主题做天气/特效 · 点击有回报的互动 · 文字可写可存刷新还在 · 能流畅跑（含低端降级）。
 > 状态（诚实）：舞台/导航/光照/后处理/星海镜面水/潮汐/漂浮书 已成形；**互动 zones、真实音频、入场编排、写字沉水** 待接（见 DECISIONS 弱项清单）。
 
-## 当前实现的骨架（潮汐图书馆）
+## 当前实现的骨架（三场景）
 
-- 唯一几何真相源：`src/theme.ts` 的 LAYOUT（`R_COURT` 镜面广场 / `DECK`+`STEPS` 观星台坡道 / `PEDESTALS` 浮岛 / `BOOKWALL` 书墙弧 / `GRAMOPHONE` / `tideOffset`；`ZONE_ANCHORS`/`FOCUS` 按 **zone type** 索引——id 属于用户数据，可改名）。
+- **多场景**（第十二轮）：`world.room.style` 即场景选择器——`loft`=潮汐图书馆（历史名）/ `attic`=雨夜阁楼 / `courtyard`=雾中山居。
+  `src/scenes/registryData.ts`（数据层：defaultWorld/makeSeed/spawn/eye/walk/zoneAnchors/focus，无 three）+ `registry.ts`（拼 Stage）；
+  每场景一份独立 SavedWorld（Dexie v2：worlds 按 style 键控、entries 带 scene 索引、meta.lastScene；旧 `main` 行已迁 `loft`）；
+  切换走 `useWorld.switchScene`（flushSave→load/seed→hydrate→瞬移 spawn）；按场景曲库 `engine.setLibrary`（加性，loft 默认曲库不变）。
+  **三 zone 契约每场景各守一份**；attic/courtyard 各有场景私有组件目录（`src/scenes/<style>/`，theme.ts 是 loft 私有真相源）。
+- 唯一几何真相源（loft）：`src/theme.ts` 的 LAYOUT（`R_COURT` 镜面广场 / `DECK`+`STEPS` 观星台坡道 / `PEDESTALS` 浮岛 / `BOOKWALL` 书墙弧 / `GRAMOPHONE` / `tideOffset`；`ZONE_ANCHORS`/`FOCUS` 按 **zone type** 索引——id 属于用户数据，可改名）。
 - 场景：`scene/Sky`（星空穹顶+银河+星点+月+地平线辉光带，水下镜像副本＝"星海倒影"底衬）、
   `scene/Water`（高配 MeshReflectorMaterial 真平面反射——"黑镜"配方 metal 1+暗 albedo+fog=false；低配菲涅尔玻璃水零 RT；+ `scene/ripples` 脚步涟漪叠加）、
   `scene/Vista`（远景层：群岛剪影 InstancedMesh + 呼吸灯塔 + 漂流水灯——纯背景，不进碰撞/契约/theme）、`scene/Starfall`（广场中心星光柱，假体积弦长 shader，雨夜熄灭）、
@@ -33,7 +38,7 @@
   `scene/gallery/BakedShell`（高配：Blender 分灯 lightmap 接管静态壳——R 暖灯间接/G 月光间接/B 天光遮蔽，无色辐照度 sqrt 编码，运行时按 mood 分组调色调强；直接光全实时=动态内容与舞台受光一致；低配或产物缺席[meta.res=0]逐像素回退程序化。管线见 `tools/bake/README.md`；标签契约 `userData.ljBake`：static 烘+换 / emitter 只当光源 / occluder 只挡光 / content 灯永不烘）、
   `scene/Lighting`（冷月主光+暖补光+Environment；消费 mood：雾/环境光/暖灯）、`scene/Atmosphere`（薄雾+微尘+偶发落水+Starfall；消费 mood：雾色浓淡 + 雨夜远雷）、`scene/SunkenThoughts`（思绪光点：核心 InstancedMesh + 晕圈点精灵，单 useFrame，renderOrder 4 透水发光）。
 - 导航/相机：`scene/PlayerControls`（帧循环五态编排；漫游有惯性/步伐包络/FOV 随速微张）+ `scene/input.ts`（DOM 输入接线）+ `scene/cameraDirector.ts`（聚焦取景/指数阻尼/避障方位选择 `computeFocusPoseClear`，纯函数有单测）+ `scene/audioListener.ts`（听者同步，位姿未变跳过）+ `scene/walk.ts`（纯函数碰撞：广场∪坡道∪观星台并集 + 台上道具圆柱碰撞，连续线性坡）。`walk.test.ts`/`cameraDirector.test.ts` 单测。
-- DEV 验证：`localStorage.lj_quality="high"|"low"` 钉死画质（自动化页签 rAF 节流会让 PerformanceMonitor 误判降级，不钉死验不到高画质路径）；DevBridge 暴露 `__lj`/`__ljStore`/`__ljAudio`/`__ljExport`(烘焙导出)/`__freecam`(放开相机)。⚠ 自动化驱动 store 一律用 UI 同款调用形状（`setMood` 要完整对象——传字符串会把非法数据 persist 进 IndexedDB）。
+- DEV 验证：重种某场景种子=删 `worlds[style]` 行与该 scene 的 entries 后 `switchScene(style)`；截图走 `canvas.toDataURL`→本地接收器（**发 Blob 不发 dataURL 字符串**），preview_screenshot 的合成器在隐藏页不可信；`localStorage.lj_quality="high"|"low"` 钉死画质（自动化页签 rAF 节流会让 PerformanceMonitor 误判降级，不钉死验不到高画质路径）；DevBridge 暴露 `__lj`/`__ljStore`/`__ljAudio`/`__ljExport`(烘焙导出)/`__freecam`(放开相机)。⚠ 自动化驱动 store 一律用 UI 同款调用形状（`setMood` 要完整对象——传字符串会把非法数据 persist 进 IndexedDB）。
 - 数据/持久化（**沿用，未改契约**）：`store/useWorld`、`config/types`(联合类型由 const 数组派生，io 校验同源)、`config/moods.ts`(心境→氛围唯一真相源)、`data/io`(校验往返)、`data/db`(IndexedDB)、`data/seed`(首次种子)。
 - 数据驱动渲染：`scene/zones/*`（书脊由思考点亮、物件按 primitive/color 生成、唱片机转碟绑 `useAudio.musicPlaying`）。
 - 音频：`audio/engine.ts`（水声独立起播；曲库压缩字节常驻、PCM 按需解码只留当前+下一首；坏轨自动跳；远雷合成）+ `audio/useAudio`（UI 镜像，换曲以引擎回调为准）。
