@@ -26,6 +26,12 @@ interface WorldState {
   hoveredInReach: boolean;
   setHovered: (id: string | null, inReach: boolean) => void;
 
+  // —— 望远镜"看记忆"（舞台件，非 zone；与 focus 互斥）——
+  /** 是否正凑在望远镜前看记忆。瞬态，不持久化。 */
+  telescopeActive: boolean;
+  openTelescope: () => void;
+  closeTelescope: () => void;
+
   // —— 漫游 ——
   focusZone: (id: string) => void;
   clearFocus: () => void;
@@ -69,12 +75,17 @@ export const useWorld = create<WorldState>((set, get) => ({
   selectedEntryId: null,
   hoveredZoneId: null,
   hoveredInReach: false,
+  telescopeActive: false,
 
   enter: () => set({ entered: true }),
   setHovered: (id, inReach) =>
     set((s) => (s.hoveredZoneId === id && s.hoveredInReach === inReach ? s : { hoveredZoneId: id, hoveredInReach: inReach })),
 
-  focusZone: (id) => set({ focusedZoneId: id, selectedEntryId: null }),
+  // 望远镜与功能区聚焦互斥：开望远镜先清 focus，反之聚焦某区也退望远镜。
+  openTelescope: () => set({ telescopeActive: true, focusedZoneId: null, selectedEntryId: null }),
+  closeTelescope: () => set({ telescopeActive: false }),
+
+  focusZone: (id) => set({ focusedZoneId: id, selectedEntryId: null, telescopeActive: false }),
   clearFocus: () => set({ focusedZoneId: null, selectedEntryId: null }),
   selectEntry: (id) => set({ selectedEntryId: id }),
 

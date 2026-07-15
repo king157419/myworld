@@ -22,6 +22,7 @@ import type { Entry } from "../config/types";
 
 const MAX_MOTES = 60;
 const SINK_DURATION = 3.5; // 秒：新思考从水面沉到安息位的动画时长
+const ERA_W = 0.14; // 潮汐纪元聚焦半宽（时间归一）：|ti-潮位| 在此内的思绪随潮上浮渐亮
 
 const CORE_R = 0.055;
 const HALO_SIZE = 0.5; // 晕圈点精灵的世界尺寸（sizeAttenuation）
@@ -96,6 +97,18 @@ export default function SunkenThoughts() {
   // 最多渲染 MAX_MOTES 条（hook 已按 createdAt 倒序，最新在前）
   const visible = useMemo(() => thoughts.slice(0, MAX_MOTES), [thoughts]);
 
+  // 时间轴范围（含导入日记）：把每条思绪的时刻归一到 0..1，供潮汐纪元显隐用。
+  // 与望远镜"看记忆"同一套时间映射——水下沉字是那趟时间旅行在水面的回响。
+  const timeRange = useMemo(() => {
+    if (!thoughts.length) return null;
+    let t0 = Infinity, t1 = -Infinity;
+    for (const e of thoughts) {
+      if (e.createdAt < t0) t0 = e.createdAt;
+      if (e.createdAt > t1) t1 = e.createdAt;
+    }
+    return { t0, span: Math.max(1, t1 - t0) };
+  }, [thoughts]);
+
   const coreRef = useRef<THREE.InstancedMesh>(null);
   const states = useRef<Map<string, MoteState>>(new Map());
 
@@ -142,7 +155,8 @@ export default function SunkenThoughts() {
     if (!core) return;
     const t = s.clock.elapsedTime;
     const now = Date.now(); // 每帧一次，60 颗共用
-    const tideShift = (tidePhase(t) - 0.5) * 0.35;
+    const p = tidePhase(t); // 当前潮位 0..1，也是"记忆时间旅行"的时间游标
+    const tideShift = (p - 0.5) * 0.35;
 
     let n = 0;
     for (const entry of visible) {
@@ -152,6 +166,9 @@ export default function SunkenThoughts() {
         states.current.set(entry.id, st);
       }
       const ageSec = (now - entry.createdAt) / 1000;
+      // 潮汐纪元：这条思绪的归一时刻与当前潮位越近，越"被潮汐带到眼前"（上浮 + 变亮）。
+      const ti = timeRange ? (entry.createdAt - timeRange.t0) / timeRange.span : 0.5;
+      const eraGlow = Math.exp(-(((ti - p) / ERA_W) ** 2));
       let curX: number;
       let curZ: number;
       let curY: number;
@@ -169,11 +186,11 @@ export default function SunkenThoughts() {
           st.sinkTriggered = true;
         }
       } else {
-        // 安息状态：潮汐缓升降 + 个性慢漂
+        // 安息状态：潮汐缓升降 + 个性慢漂 + 聚焦纪元随潮上浮（"从过去浮上来"）
         const bobY = Math.sin(t * 0.22 + st.bobPhase) * 0.045;
         curX = st.x + Math.sin(t * 0.11 + st.driftPhaseX) * 0.12;
         curZ = st.z + Math.cos(t * 0.09 + st.driftPhaseZ) * 0.12;
-        curY = st.restY + tideShift + bobY;
+        curY = st.restY + tideShift + bobY + eraGlow * 0.16;
       }
 
       tmpMat.makeTranslation(curX, curY, curZ);
@@ -182,9 +199,10 @@ export default function SunkenThoughts() {
       halo.pos[n * 3 + 1] = curY;
       halo.pos[n * 3 + 2] = curZ;
 
-      // 深度 → 亮度：curY ≈ -0.1（高潮浅处）~ -1.6（低潮深处）
+      // 深度 → 亮度：curY ≈ -0.1（高潮浅处）~ -1.6（低潮深处）；再乘潮汐纪元系数
+      // （聚焦纪元的思绪更亮，其余退回安静的底衬，绝不熄灭——水面永远有一片微光星海）。
       const depthFactor = Math.max(0, Math.min(1, (curY + 1.6) / 1.5));
-      const baseAlpha = 0.3 + depthFactor * 0.6; // 0.3 ~ 0.9
+      const baseAlpha = (0.3 + depthFactor * 0.6) * (0.55 + 0.55 * eraGlow); // 0.16 ~ 0.99
       core.setColorAt(n, tmpCol.copy(CORE_COLOR).multiplyScalar(Math.min(1, baseAlpha * 1.1)));
       tmpCol.copy(HALO_COLOR).multiplyScalar(baseAlpha * 0.5);
       halo.col[n * 3] = tmpCol.r;

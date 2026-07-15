@@ -77,6 +77,19 @@ export const COURT_CENTER: Vec3 = [0, 0, -0.5];
 // 留声机（影音区，在观星台上）—— 空间化音乐声源。
 export const GRAMOPHONE: Vec3 = [0, DECK_Y, -9.4];
 
+// 望远镜（观星台上，"看记忆"舞台件——不是三 zone 之一，只读已有 thought 呈现记忆星海）。
+// 位置与 walk.ts 的碰撞体同源（DECK.x1-1.0, DECK.zFar+0.9）；朝向略转向广场中心，
+// 目镜（星对角，朝资产 +Z）迎向登台来客。资产：物镜朝天偏后，目镜迎人。
+export const TELESCOPE: Vec3 = [DECK.x1 - 1.0, DECK_Y, DECK.zFar + 0.9];
+export const TELESCOPE_ROT_Y = -0.32; // 略朝广场中心
+export const TELESCOPE_TARGET_H = 1.5; // 归一目标高（米）
+// 归一+贴地后的局部关键点（由 GLB 原生坐标 × 目标高推得，见 build_telescope.py 头注）：
+//   目镜口（相机凑近看记忆的落点）/ 物镜口（看向夜空的方向锚）。
+export const TELE_EYEPIECE_LOCAL: Vec3 = [0, 0.67, 0.21];
+export const TELE_OBJECTIVE_LOCAL: Vec3 = [0, 1.36, -0.38];
+/** 望远镜可交互登记用的哨兵 id（非 zone，不进 world.zones / 数据契约）。 */
+export const TELESCOPE_ID = "stage-telescope";
+
 // 功能区锚点（相机聚焦 + 准心热点）。position = 看向的中心，ry = 正面朝向。
 // ⚠ 按 zone **type** 索引，不按 id：id 属于用户数据（导入的世界可以改名），
 //   锚点描述的是舞台几何（bookshelf 皮肤长在哪），跟着 type 走。id→type 由 world.zones 解析。

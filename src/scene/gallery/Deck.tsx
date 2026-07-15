@@ -87,19 +87,7 @@ export default function Deck({ baked = false }: { baked?: boolean }) {
               ))}
             </group>
           ))}
-          {/* 望远镜（朝天） */}
-          <group position={[DECK.x1 - 1.0, DECK_Y, DECK.zFar + 0.9]}>
-            <mesh name="scope-base" userData={{ ljBake: "static" }} position={[0, 0.5, 0]} material={brassMat}>
-              <cylinderGeometry args={[0.055, 0.07, 1.0, 20]} />
-            </mesh>
-            <mesh name="scope-tube" userData={{ ljBake: "static" }} position={[0, 0.9, 0.18]} rotation={[0.9, 0, 0]} castShadow>
-              <cylinderGeometry args={[0.085, 0.1, 0.9, 20]} />
-              <meshStandardMaterial color={"#1c2430"} roughness={0.4} metalness={0.7} />
-            </mesh>
-            <mesh name="scope-foot" userData={{ ljBake: "static" }} position={[0, 0.06, 0]} material={woodMat}>
-              <cylinderGeometry args={[0.18, 0.2, 0.12, 24]} />
-            </mesh>
-          </group>
+          {/* 望远镜现由 TelescopeModel（自制 GLB，观星台·看记忆舞台件）接管——见 gallery/index。 */}
         </>
       )}
     </group>

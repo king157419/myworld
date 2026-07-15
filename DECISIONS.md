@@ -437,3 +437,25 @@ walk/聚焦/退出/三 zone 契约/雨夜（星光柱熄灭+暖通道随 lampMul
 - **直接光进烘焙**（真正换脸的一步：需 shadow catcher 或内容/舞台双光路设计——大改，等用户判）
 - 月光间接通道改进（当前近空关死）；喇叭口暗区补灯；KTX2 压缩贴图（当前 PNG 1.1MB 可接受）
 - 第十轮遗留继续挂账：ripple→distortionMap、noise roughnessMap、PhysicalMaterial 三件套、望远镜、42° 坡、真机 FPS
+
+## 第十四轮 · 望远镜「看记忆」+ 六项打磨（loft 继续，Opus）
+
+主人点单：望远镜要"优美 + 可交互"（选方案二·看记忆）、六项优化全上、建模用 Blender。
+
+| 项 | 决策 |
+| --- | --- |
+| **望远镜模型** | `tools/bake/build_telescope.py` 程序化黄铜折射镜（锥形木三脚架+脚箍+撑盘 / 方位座 / 曲臂双抱箍 / 镜筒+雕刻箍环+遮光罩+物镜玻璃 / **星对角镜把目镜折向来客** / 调焦座+双轮 / 寻星镜）。仰 57°，物镜朝夜空、目镜迎人。Cycles AO 烘焙+smart-UV→`telescope.glb`+`_ao.png`（14760 tri）。语义材质名沿用留声机那套 + glass。`TelescopeModel.tsx` 重映射+真点光，替换 `Deck.tsx` 三根圆柱堆的旧镜。 |
+| **「看记忆」交互** | 望远镜是**舞台件不是第四个 zone**（三 zone 契约不动）：`theme.TELESCOPE_ID` 哨兵登记为可交互件，命中 ENTER → `useWorld.telescopeActive`（与 focus 互斥）→ PlayerControls 阻尼飞到目镜后、望向物镜；ESC/返回退出。`MemoryScope.tsx` 圆目镜叠层：把 `type==='thought'`（含导入日记）按时间铺成"记忆星河"canvas，**同一股潮汐（`tidePhase`）载你在时间轴上前后穿行**（#4 时间旅行），也可手动拖时间刻度；点星读到那条记忆原文。纯数据驱动，星河可由数据重建。 |
+| **沉字纪元显隐** | `SunkenThoughts` 每颗沉字归一到时间轴，与潮位相位近的纪元随潮**上浮+渐亮**（水面上的时间旅行回响），其余退回底衬绝不熄灭。 |
+| **涟漪 distortionMap** | `Water` 高配把脚步涟漪场离屏渲成 256² 灰度贴图（红=环强度，与水面 circleGeometry 同一 UV↔世界映射），喂 `MeshReflectorMaterial.distortionMap`（distortion 0.22）——倒影星空在踩出的每圈涟漪处真实被扯动（叠层 RippleOverlay 仍管亮环）。清掉第十轮起挂账的 ripple→distortionMap。 |
+| **入场编排** | 入场电影加"掠水拍点"：中途 `sin(πx)` 把相机压近水面再抬到眼平（仅有水场景，防非水场景穿地）+ 尾程二次落水涟漪；INTRO_DUR 5.5→6.4，视线从环视回廊落到眼前的路。 |
+| **留声机壳顶黑斑** | 挂账项复查：铃口顶缘那片"黑"**主要是越过喇叭剪影看到的暗夜空**（射线实测：上半 58m 远=天空，下半命中内壁）——光照修不动。加一盏铃口后上方冷缘光+抬 brass emissive 至 0.42 做轻缓解；真正成片的暗只在**够不到的正上方机位**（观星台是最高可行走面，玩家只平视/略仰）。DoubleSide 实测无效已移除（不是剔除黑洞）。 |
+
+### 本轮最大的坑：**烘焙鬼影**（记录，别再踩）
+删了 `Deck.tsx` 的旧三柱望远镜（`ljBake:"static"`），高画质档却仍有一根黑筒挡住新望远镜。射线查出是 `Shell` 组里 `Material_13`（`#1c2430` metal .7）——**老镜筒被烘进了上一次的 BakedShell GLB**。CLAUDE.md 早写明"改了 static 件几何须重烘"：低画质导出 `shell.glb`(631 网格,无老镜筒)+`lights.json`(34 盏) → `bake_shell.py` 2048/384 → `bake:install` → 鬼影消失。**教训：删/改任何 `ljBake:"static"` 件，必须连带重烘 shell，否则高低画质不一致，旧几何以鬼影留在高配。** 重烘定标与旧值近似（warmScale 0.0148→0.0169，sky/moon 几乎不变），整场无回退。
+
+### 验证（诚实）
+环境两个交互浏览器面都不可用（真 Chrome 扩展没连；内嵌 Browser 面后台标签冻结 rAF/不建 WebGL）→ 改用 **Playwright 自带 Chromium**（rAF 正常）+ `__lj.advance()` 手动步帧 + `__freecam` 摆机位 + `toDataURL`→接收器存盘。实拍验过：望远镜在场（鬼影除后暖铜筒身/箍环/目镜迎客全清晰）、看记忆全链路（星座+潮汐穿越+点星读到真实日记）、60 颗沉字明暗有别、distortion 接线（0.22 + 256² 贴图 + USE_DISTORTION 宏）、留声机眼平好看、入场落定在 spawn。build/49 测试绿。入场"掠水"动画与涟漪扭曲的动态最好在实时游玩里看（静态帧看不全）。
+
+### 仍挂账
+真实音频每场景切库、月光间接通道、KTX2 压缩、直接光进烘焙、留声机壳顶正上方机位暗块（够不到，暂不追）、attic/courtyard 打磨（主人明确冻结至 loft 完成）。

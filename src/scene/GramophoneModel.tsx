@@ -23,7 +23,7 @@ const REMAT: Record<string, Spec> = {
   // 外壁金属度不拉满：本场景 env 薄，纯金属在背光面是死黑（r9 F1 教训）——
   // 降金属度让暖点光的漫反射接手，再给一丝自发光模拟"灯光擦过铜面"。
   // AgX 会把 ≤1 的自发光压暗一档——内壁要"发光的金花"就得给到 >1。
-  brass: { color: PALETTE.brass, metalness: 0.5, roughness: 0.44, emissive: PALETTE.glowAmber, emissiveIntensity: 0.36, envMul: 1.9 },
+  brass: { color: PALETTE.brass, metalness: 0.5, roughness: 0.44, emissive: PALETTE.glowAmber, emissiveIntensity: 0.42, envMul: 1.9 },
   brass_inner: { color: "#e8c48a", metalness: 0.7, roughness: 0.42, emissive: PALETTE.glowAmber, emissiveIntensity: 1.4, noAo: true },
   brass_dark: { color: "#8a6a34", metalness: 0.95, roughness: 0.4, envMul: 1.6 }, // 鹅颈/箍环/摇柄/垫脚
   steel: { color: "#9aa0a6", metalness: 0.9, roughness: 0.38, envMul: 1.4 }, // 唱臂/撑杆/唱针轴
@@ -94,6 +94,10 @@ function Model() {
       <pointLight position={[-0.9, 1.6, -0.5]} color={"#9fb4ff"} intensity={2.6} distance={3.5} decay={2} />
       {/* 顶背月光：壳顶背面的法线朝上朝后，前侧键光照不到——没有这盏就是黑背（本轮实测） */}
       <pointLight position={[0.3, 1.9, -0.75]} color={"#b8c6e8"} intensity={4.5} distance={3.2} decay={2} />
+      {/* 喇叭口顶缘缘光：铃口顶缘（远离来客的那道边）法线朝上朝后，逆着暗天穹被 AgX 压成黑边
+          （r13 挂账"壳顶黑斑"）——把光放到铃口后上方擦出一道冷缘高光，黑边变亮边；
+          不再放正上方（那会把喇叭腔打爆成白，实测）。 */}
+      <pointLight position={[0, 2.35, -0.72]} color={"#cdd8f0"} intensity={3.2} distance={2.6} decay={2} />
     </group>
   );
 }

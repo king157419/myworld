@@ -8,6 +8,7 @@ import BookEditor from "./BookEditor";
 import ObjectForm from "./ObjectForm";
 import RecordPanel from "./RecordPanel";
 import RecentPanel from "./RecentPanel";
+import MemoryScope from "./MemoryScope";
 
 // HUD 编排：入场页（EnterOverlay）→ 漫游层（Reticle + 提示 + DockControls）→
 // 聚焦层（返回键 + 幕布 + 按 zone.type 分发的面板）。各块的内部状态在各自文件里。
@@ -18,6 +19,8 @@ export default function Hud() {
   const focusedZoneId = useWorld((s) => s.focusedZoneId);
   const zone = useWorld((s) => s.world.zones.find((z) => z.id === s.focusedZoneId) ?? null);
   const clearFocus = useWorld((s) => s.clearFocus);
+  const telescopeActive = useWorld((s) => s.telescopeActive);
+  const closeTelescope = useWorld((s) => s.closeTelescope);
   const startAudio = useAudio((s) => s.start);
 
   const [showRecent, setShowRecent] = useState(false);
@@ -32,8 +35,8 @@ export default function Hud() {
 
   return (
     <div className="hud">
-      {/* 漫游层 */}
-      {!focusedZoneId && (
+      {/* 漫游层（聚焦某区 / 凑望远镜看记忆时都收起）*/}
+      {!focusedZoneId && !telescopeActive && (
         <>
           <Reticle />
           <div className="controls-hint">
@@ -54,6 +57,16 @@ export default function Hud() {
         </button>
       )}
       {focusedZoneId && <div className="focus-backdrop" onClick={clearFocus} aria-hidden />}
+
+      {/* ── 望远镜"看记忆"层：返回键 + 目镜叠层（不占用侧栏面板/数据契约）── */}
+      {telescopeActive && (
+        <button className="back" onClick={closeTelescope} aria-label="离开目镜（ESC）">
+          <span className="back-chevron" aria-hidden>‹</span>
+          <span className="back-label">离开目镜</span>
+          <span className="back-keycap" aria-label="ESC 键">ESC</span>
+        </button>
+      )}
+      {telescopeActive && <MemoryScope />}
 
       {/* 左侧面板（z-index:2 在幕布之上）*/}
       {zone && (

@@ -1,4 +1,5 @@
 import GramophoneModel from "../GramophoneModel";
+import TelescopeModel from "../TelescopeModel";
 import Lanterns from "./Lanterns";
 import BookWall from "./BookWall";
 import Deck from "./Deck";
@@ -29,6 +30,7 @@ export default function Gallery({ low = false }: { low?: boolean }) {
       <Pedestals baked={baked} />
       <FloatingBooks />
       <GramophoneModel />
+      <TelescopeModel />
       <ListeningNook />
       {baked && <BakedShell />}
     </group>

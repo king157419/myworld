@@ -39,9 +39,10 @@ export function useWalkInput(canvas: HTMLCanvasElement, onPrimary: () => void): 
       pitch.current = THREE.MathUtils.clamp(pitch.current - e.movementY * SENS, -PITCH_MAX, PITCH_MAX);
     };
     const onKey = (down: boolean) => (e: KeyboardEvent) => {
-      if (e.code === "Escape" && down && useWorld.getState().focusedZoneId) {
-        useWorld.getState().clearFocus();
-        return;
+      if (e.code === "Escape" && down) {
+        const s = useWorld.getState();
+        if (s.focusedZoneId) { s.clearFocus(); return; }
+        if (s.telescopeActive) { s.closeTelescope(); return; }
       }
       if (down) keys.current.add(e.code);
       else keys.current.delete(e.code);
@@ -63,7 +64,7 @@ export function useWalkInput(canvas: HTMLCanvasElement, onPrimary: () => void): 
         });
         return;
       }
-      if (s.focusedZoneId) return;
+      if (s.focusedZoneId || s.telescopeActive) return; // 看记忆/聚焦时不抢指针锁
       if (isLocked()) onPrimaryRef.current();
       else canvas.requestPointerLock?.();
     };
