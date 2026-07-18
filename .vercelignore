@@ -1,0 +1,10 @@
+# 私人内容——绝不上传到 Vercel（与 .gitignore 同步）。
+# 仓库是 public 的：日记等个人数据只进本地 IndexedDB / 本地 inbox，绝不上云。
+# 正常部署走 GitHub 集成（git 里本就没有这些文件）；此文件是纵深防御，
+# 防止将来有人从本地误跑 `vercel deploy` 把工作区里的隐私文件直传上去。
+public/inbox/
+dairy.zip
+
+# 构建产物 / 依赖（Vercel 会自行安装与构建）
+node_modules
+dist

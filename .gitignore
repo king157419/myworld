@@ -33,3 +33,5 @@ _staging/audio/*
 # 私人内容（仓库是 public 的——日记等个人数据只进本地 IndexedDB，绝不进 git）
 dairy.zip
 public/inbox/
+
+.vercel
