@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import type { Primitive } from "../config/types";
 import { PRIMITIVES } from "../config/types";
 import { useEntryForm } from "./useEntryForm";
@@ -32,6 +33,20 @@ export default function ObjectForm({ zoneId }: { zoneId: string }) {
     },
   });
 
+  const titleRef = useRef<HTMLInputElement>(null);
+
+  // 挂载时自动聚焦（不用 autoFocus，对滑入动画更稳）。
+  useEffect(() => { titleRef.current?.focus(); }, []);
+
+  // 切换到已有条目：聚焦并把光标移到文末。
+  useEffect(() => {
+    if (!editingId) return;
+    const el = titleRef.current;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, [editingId]);
+
   return (
     <div className="panel">
       <div className="panel-masthead">
@@ -44,7 +59,7 @@ export default function ObjectForm({ zoneId }: { zoneId: string }) {
 
         <label className="field">
           <span>标题</span>
-          <input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="那副陪了三年的耳机" />
+          <input ref={titleRef} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="那副陪了三年的耳机" />
         </label>
         <label className="field">
           <span>来历</span>

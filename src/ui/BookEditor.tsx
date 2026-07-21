@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useEntryForm } from "./useEntryForm";
 import EntryList from "./EntryList";
 
@@ -20,6 +21,24 @@ export default function BookEditor({ zoneId }: { zoneId: string }) {
     },
   });
 
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // 挂载时自动聚焦（不用 autoFocus，对滑入动画更稳）。
+  useEffect(() => { textareaRef.current?.focus(); }, []);
+
+  // 切换到已有条目：聚焦、光标到文末、调整高度一次。
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.focus();
+    if (editingId) {
+      const len = el.value.length;
+      el.setSelectionRange(len, len);
+    }
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + "px";
+  }, [editingId]);
+
   return (
     <div className="panel">
       {/* 两行制眉头 */}
@@ -35,8 +54,15 @@ export default function BookEditor({ zoneId }: { zoneId: string }) {
         </p>
 
         <textarea
+          ref={textareaRef}
+          className="book-textarea"
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            const el = e.target;
+            el.style.height = "auto";
+            el.style.height = el.scrollHeight + "px";
+          }}
           placeholder="写下此刻的一段……"
           rows={7}
           aria-label="思考内容"

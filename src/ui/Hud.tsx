@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useWorld } from "../store/useWorld";
 import { useAudio } from "../audio/useAudio";
 import EnterOverlay from "./EnterOverlay";
@@ -21,9 +21,31 @@ export default function Hud() {
   const clearFocus = useWorld((s) => s.clearFocus);
   const telescopeActive = useWorld((s) => s.telescopeActive);
   const closeTelescope = useWorld((s) => s.closeTelescope);
+  const editorDirty = useWorld((s) => s.editorDirty);
+  const style = useWorld((s) => s.world.room.style);
   const startAudio = useAudio((s) => s.start);
 
   const [showRecent, setShowRecent] = useState(false);
+
+  // 切场景黑幕：style 变化瞬间盖上纯黑，下一拍 0.6s 淡出——盖住"一帧换了整个世界"的瞬跳。
+  // 首挂载不放（入场页/boot 提示已经盖着）。用内联过渡而非样式表，避免依赖 CSS 文件改动。
+  const [veil, setVeil] = useState(false);
+  const veilFirst = useRef(true);
+  useEffect(() => {
+    if (veilFirst.current) {
+      veilFirst.current = false;
+      return;
+    }
+    setVeil(true);
+    const raf = requestAnimationFrame(() => requestAnimationFrame(() => setVeil(false)));
+    return () => cancelAnimationFrame(raf);
+  }, [style]);
+
+  // 关闭编辑面板前的丢稿确认（Esc 路径在 input.ts 做同样的事；这里管暗幕与返回键）。
+  const requestClose = () => {
+    if (editorDirty && !window.confirm("有未保存的内容，确定离开吗？")) return;
+    clearFocus();
+  };
 
   const doEnter = async () => {
     await startAudio();
@@ -48,15 +70,15 @@ export default function Hud() {
         </>
       )}
 
-      {/* ── 聚焦层：返回键（右上角）+ 透明幕布（点击面板外侧退出）── */}
+      {/* ── 聚焦层：返回键（右上角）+ 透明幕布（点击面板外侧退出；有未保存草稿先确认）── */}
       {focusedZoneId && (
-        <button className="back" onClick={clearFocus} aria-label="返回漫游（ESC）">
+        <button className="back" onClick={requestClose} aria-label="返回漫游（ESC）">
           <span className="back-chevron" aria-hidden>‹</span>
           <span className="back-label">返回漫游</span>
           <span className="back-keycap" aria-label="ESC 键">ESC</span>
         </button>
       )}
-      {focusedZoneId && <div className="focus-backdrop" onClick={clearFocus} aria-hidden />}
+      {focusedZoneId && <div className="focus-backdrop" onClick={requestClose} aria-hidden />}
 
       {/* ── 望远镜"看记忆"层：返回键 + 目镜叠层（不占用侧栏面板/数据契约）── */}
       {telescopeActive && (
@@ -83,6 +105,20 @@ export default function Hud() {
           <RecentPanel onClose={() => setShowRecent(false)} />
         </aside>
       )}
+
+      {/* 切场景黑幕（内联样式，见上方 veil 注释）。pointer-events 永远放行。 */}
+      <div
+        aria-hidden
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "#000",
+          pointerEvents: "none",
+          zIndex: 40,
+          opacity: veil ? 1 : 0,
+          transition: veil ? "none" : "opacity 0.6s ease",
+        }}
+      />
     </div>
   );
 }

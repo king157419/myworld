@@ -25,6 +25,9 @@ interface WorldState {
   /** 对准的功能区是否已进入可交互距离（远处只提示名字、近了才能按 ENTER）。瞬态。 */
   hoveredInReach: boolean;
   setHovered: (id: string | null, inReach: boolean) => void;
+  /** 编辑面板是否有未保存草稿（Esc/暗幕关闭前确认用；useEntryForm 上报）。瞬态。 */
+  editorDirty: boolean;
+  setEditorDirty: (d: boolean) => void;
 
   // —— 望远镜"看记忆"（舞台件，非 zone；与 focus 互斥）——
   /** 是否正凑在望远镜前看记忆。瞬态，不持久化。 */
@@ -80,13 +83,15 @@ export const useWorld = create<WorldState>((set, get) => ({
   enter: () => set({ entered: true }),
   setHovered: (id, inReach) =>
     set((s) => (s.hoveredZoneId === id && s.hoveredInReach === inReach ? s : { hoveredZoneId: id, hoveredInReach: inReach })),
+  editorDirty: false,
+  setEditorDirty: (d) => set((s) => (s.editorDirty === d ? s : { editorDirty: d })),
 
   // 望远镜与功能区聚焦互斥：开望远镜先清 focus，反之聚焦某区也退望远镜。
   openTelescope: () => set({ telescopeActive: true, focusedZoneId: null, selectedEntryId: null }),
   closeTelescope: () => set({ telescopeActive: false }),
 
-  focusZone: (id) => set({ focusedZoneId: id, selectedEntryId: null, telescopeActive: false }),
-  clearFocus: () => set({ focusedZoneId: null, selectedEntryId: null }),
+  focusZone: (id) => set({ focusedZoneId: id, selectedEntryId: null, telescopeActive: false, editorDirty: false }),
+  clearFocus: () => set({ focusedZoneId: null, selectedEntryId: null, editorDirty: false }),
   selectEntry: (id) => set({ selectedEntryId: id }),
 
   gotoEntry: (id) => {
@@ -144,7 +149,7 @@ export const useWorld = create<WorldState>((set, get) => ({
       get().hydrate(def, seed);
       await persistNow(def, seed);
     }
-    // hydrate 已清 focus/hover。TODO(下一轮)：切场景时按目标场景切换水声/曲库配置（audio/engine）。
+    // hydrate 已清 focus/hover。水声/曲库/空间化锚点由 audio/useSceneAudio 订阅 room.style 统一切换。
     void get().absorbInbox();
   },
 
@@ -167,8 +172,19 @@ export const useWorld = create<WorldState>((set, get) => ({
     return fresh;
   },
 
+  // telescopeActive 必须一并清：切场景时若正看望远镜，新场景可能没有望远镜（只有 loft 有），
+  // 残留 true 会让帧循环继续朝 loft 目镜的世界坐标阻尼飞行（审计确认项）。
   hydrate: (world, entries) =>
-    set({ world, entries, focusedZoneId: null, selectedEntryId: null, hoveredZoneId: null, hoveredInReach: false }),
+    set({
+      world,
+      entries,
+      focusedZoneId: null,
+      selectedEntryId: null,
+      hoveredZoneId: null,
+      hoveredInReach: false,
+      telescopeActive: false,
+      editorDirty: false,
+    }),
 }));
 
 // 注意（zustand v5 基于 useSyncExternalStore）：选择器若每次都返回新数组/对象，

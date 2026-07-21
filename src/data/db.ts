@@ -109,7 +109,11 @@ export function saveDebounced(world: WorldConfig, entries: Entry[], delay = 400)
     timer = undefined;
     const p = pending;
     pending = undefined;
-    if (p) void persistNow(p.world, p.entries);
+    if (p)
+      persistNow(p.world, p.entries).catch((err) => {
+        console.error("[lingjing] 保存失败：", err);
+        window.dispatchEvent(new CustomEvent("lj:save-error"));
+      });
   }, delay);
 }
 

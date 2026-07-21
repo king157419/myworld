@@ -4,7 +4,7 @@ import * as THREE from "three";
 import { useWorld } from "../store/useWorld";
 import { interactableObjs, zoneIdOf } from "./interactables";
 import { spawnRipple } from "./ripples";
-import { useWalkInput } from "./input";
+import { camExitGate, useWalkInput } from "./input";
 import { computeFocusPoseClear, dampPose } from "./cameraDirector";
 import { syncAudioListener } from "./audioListener";
 import { SCENE_DATA, resolveScene } from "../scenes/registryData";
@@ -119,14 +119,22 @@ export default function PlayerControls() {
       sightRay.far = Math.max(0.1, d - radius * 0.8); // 主体自身不算遮挡
       return sightRay.intersectObjects(occluders, false).length === 0;
     };
-    computeFocusPoseClear(camera as THREE.PerspectiveCamera, center, radius, isClear, focusGoal, focusGoalQ);
+    // 取景距离按基准 FOV 反算：跑步中 FOV 被微张过（+2.6°），用 live 值会算出略近的机位
+    // （包围球框不满）。只在这次计算里临时用 FOV_BASE，live FOV 由聚焦分支阻尼收回。
+    const persp = camera as THREE.PerspectiveCamera;
+    const liveFov = persp.fov;
+    persp.fov = FOV_BASE;
+    computeFocusPoseClear(persp, center, radius, isClear, focusGoal, focusGoalQ);
+    persp.fov = liveFov;
     exitActive.current = false;
+    camExitGate.active = false;
   }, [camera, center, focusGoal, focusGoalQ, yaw, pitch, scene, sightRay, sightDir]);
 
   const beginExit = useCallback(() => {
     if (!snapshot.current) return;
     exitAccum.current = 0;
     exitActive.current = true;
+    camExitGate.active = true; // 飞回期间：input 层不抢锁、不交互
   }, []);
 
   // 凑到望远镜目镜后一点、望向物镜（沿镜轴望进夜空）。目镜/物镜局部点由 theme 常量给，
@@ -168,6 +176,14 @@ export default function PlayerControls() {
       pitch.current = -0.04;
       vel.current.set(0, 0);
       bobAmp.current = 0;
+      // 转场状态机残留一并清：退出飞回进行中切场景，快照还是旧场景坐标，
+      // 让退出分支接着跑会朝旧世界的位置飞（审计 A10）。
+      exitActive.current = false;
+      snapshot.current = null;
+      exitAccum.current = 0;
+      prevFocused.current = null;
+      prevTele.current = false;
+      camExitGate.active = false;
     }
 
     // ── 聚焦进/出转场：帧内检测（在一切分支之前），消除 effect 晚一帧导致的"直接跳转" ──
@@ -183,22 +199,34 @@ export default function PlayerControls() {
       prevTele.current = s.telescopeActive;
     }
 
-    // ── ① 入场前：缓慢电影感环绕，俯瞰漂在星海上的整座回廊 ──
+    // 入场视线目标从出生点朝向派生（不再硬编码 loft 坐标——上次停在别的场景时，
+    // 刷新入场的视线会望穿那个场景的墙，审计 A8）。yaw=spawn.yaw 时"向前 d"即 -Z 旋转。
+    const yaw0 = sd.spawn.yaw;
+    const lookAhead = (d: number, h: number) =>
+      camera.lookAt(spawn[0] - Math.sin(yaw0) * d, h, spawn[2] - Math.cos(yaw0) * d);
+
+    // ── ① 入场前：缓慢电影感环绕，俯瞰整座场景（机位/视线锚在出生点系，三场景通用）──
     if (!s.entered) {
       const t = clock.elapsedTime;
-      camera.position.set(Math.sin(t * 0.06) * 3.0, 3.7 + Math.sin(t * 0.12) * 0.2, 10.6 + Math.cos(t * 0.06) * 1.0);
-      camera.lookAt(Math.sin(t * 0.06) * 0.5, 0.9, -3.0);
+      camera.position.set(
+        spawn[0] + Math.sin(t * 0.06) * 3.0,
+        3.7 + Math.sin(t * 0.12) * 0.2,
+        spawn[2] + 4.0 + Math.cos(t * 0.06) * 1.0,
+      );
+      camera.lookAt(spawn[0] + Math.sin(t * 0.06) * 0.5, 0.9, spawn[2] - 9.6);
       return;
     }
 
-    // ── ② 入场电影（点「进入」后约 5.5 秒）：从环绕机位缓缓沉到水面眼平，落在出生点，再交还控制 ──
+    // ── ② 入场电影：从环绕机位缓缓沉到眼平，落在出生点，再交还控制（任意按键可跳过）──
     if (!introDone.current && !s.focusedZoneId) {
       if (introStart.current === null) {
         introStart.current = clock.elapsedTime;
         introFrom.current.copy(camera.position);
       }
       const e = clock.elapsedTime - introStart.current;
-      if (e < INTRO_DUR) {
+      // 跳过：入场 0.4s 后任意按键即快进到收尾（0.4s 静默期挡住"点进入时残留的回车/空格"）。
+      const wantSkip = e > 0.4 && keys.current.size > 0;
+      if (e < INTRO_DUR && !wantSkip) {
         const x = Math.min(1, e / INTRO_DUR);
         const k = x * x * x * (x * (x * 6 - 15) + 10); // smootherstep
         // 掠过水面再落定：中途把相机压到近水面（sin(πx) 峰在半程），像滑翔着贴上星海、
@@ -209,8 +237,8 @@ export default function PlayerControls() {
           THREE.MathUtils.lerp(introFrom.current.y, sd.eye, k) + Math.sin(e * 0.6) * 0.04 - dip,
           THREE.MathUtils.lerp(introFrom.current.z, spawn[2], k),
         );
-        // 视线从"环视整座回廊"缓缓落到"眼前要走的路"。
-        camera.lookAt(0, THREE.MathUtils.lerp(1.35, 1.05, k), THREE.MathUtils.lerp(-5.4, -3.4, k));
+        // 视线从"环视整座场景"缓缓落到"眼前要走的路"（目标随出生点朝向，见 lookAhead）。
+        lookAhead(THREE.MathUtils.lerp(12, 10, k), THREE.MathUtils.lerp(1.35, 1.05, k));
         // 掠水拍点：半程压到最低时荡开第一圈涟漪——"原来我贴着星海滑进来"（仅有水场景）。
         if (sd.water && !introRipple.current && x > 0.5) {
           introRipple.current = true;
@@ -224,16 +252,32 @@ export default function PlayerControls() {
         syncAudioListener(camera);
         return;
       }
-      // 收尾：对齐漫游状态到落点，交还控制
+      // 收尾（自然播完或按键跳过）：把相机摆到入场终点、按终点视线取向，再从相机四元数
+      // 反算漫游 yaw/pitch——硬编码 pitch(-0.04) 与 lookAt 实际朝向差约 1°，交接帧视线
+      // 会闪一下（审计 A1）。从同一个四元数出发，交接必然零跳变。
       introDone.current = true;
       feet.current.set(spawn[0], 0, spawn[2]);
-      yaw.current = sd.spawn.yaw;
-      pitch.current = -0.04;
+      camera.position.set(spawn[0], sd.eye, spawn[2]);
+      lookAhead(10, 1.05);
+      tmpEuler.setFromQuaternion(camera.quaternion);
+      yaw.current = tmpEuler.y;
+      pitch.current = tmpEuler.x;
     }
+
+    // 聚焦/望远镜/退出期间把 FOV 阻尼回基准：FOV 阻尼原本只在漫游分支里跑，跑步中(≈60.6°)
+    // 进聚焦会把张开的视野一路冻结到退出，交还漫游后才缓慢"收缩"（审计 A3）。
+    const settleFov = () => {
+      const persp = camera as THREE.PerspectiveCamera;
+      if (Math.abs(persp.fov - FOV_BASE) > 0.01) {
+        persp.fov = THREE.MathUtils.damp(persp.fov, FOV_BASE, 6, dt);
+        persp.updateProjectionMatrix();
+      }
+    };
 
     // ── ③ 聚焦某功能区：指数阻尼飞入并定格（目标由 beginFocus 一次算好）──
     if (s.focusedZoneId) {
       dampPose(camera, focusGoal, focusGoalQ, dt);
+      settleFov();
       syncAudioListener(camera);
       return;
     }
@@ -241,6 +285,7 @@ export default function PlayerControls() {
     // ── ③' 望远镜"看记忆"：阻尼飞到目镜后、望向夜空并定格（目标由 beginTelescope 算好）──
     if (s.telescopeActive) {
       dampPose(camera, teleGoal, teleGoalQ, dt);
+      settleFov();
       syncAudioListener(camera);
       return;
     }
@@ -250,15 +295,26 @@ export default function PlayerControls() {
       exitPos.set(snapshot.current.x, snapshot.current.y + sd.eye, snapshot.current.z);
       tmpEuler.set(snapshot.current.pitch, snapshot.current.yaw, 0);
       exitQ.setFromEuler(tmpEuler);
-      dampPose(camera, exitPos, exitQ, dt);
-      syncAudioListener(camera);
       exitAccum.current += dt;
-      if (camera.position.distanceTo(exitPos) < 0.03 || exitAccum.current > 1.4) {
+      // 后段加速收敛（1.1s 起速率翻倍）：极远聚焦（水面远端→书墙 10+ 单位）在原 1.4s 硬切时
+      // 还差零点几米，会看到一个小跳变（审计 A7）——加速让兜底几乎永远到不了。
+      const late = exitAccum.current > 1.1;
+      dampPose(camera, exitPos, exitQ, dt, late ? 14 : 6, late ? 18 : 9);
+      settleFov();
+      syncAudioListener(camera);
+      if (camera.position.distanceTo(exitPos) < 0.03 || exitAccum.current > 2.0) {
         feet.current.set(snapshot.current.x, snapshot.current.y, snapshot.current.z);
         yaw.current = snapshot.current.yaw;
         pitch.current = snapshot.current.pitch;
         snapshot.current = null;
         exitActive.current = false;
+        camExitGate.active = false;
+        // 程序化回锁：这次解锁是我们自己 exitPointerLock 的（Pointer Lock 规范允许这种情况
+        // 无手势重锁）。被拒（比如中途用户按过 Esc 破锁）就静默回退到"点击画布回锁"。
+        try {
+          const p = gl.domElement.requestPointerLock?.() as unknown as Promise<void> | undefined;
+          p?.catch?.(() => {});
+        } catch { /* 回退：点击画布回锁 */ }
       }
       return;
     }

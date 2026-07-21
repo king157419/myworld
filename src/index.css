@@ -591,9 +591,17 @@ input:not([type]) {
   border-bottom: 1px solid var(--rule);
   border-radius: 0;
   padding: 0 0 8px;
-  resize: none;
+  resize: vertical;
   outline: none;
   transition: border-color var(--t-quick) var(--ease);
+}
+textarea {
+  max-height: 40vh;
+  overflow-y: auto;
+}
+/* 书房主文本域：7 行起始高，内容多时向下撑开 */
+.book-textarea {
+  min-height: 13.3em;
 }
 textarea::placeholder,
 input::placeholder {

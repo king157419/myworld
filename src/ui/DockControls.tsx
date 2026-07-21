@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MOOD_ORDER, MOOD_PRESETS } from "../config/moods";
 import { useWorld } from "../store/useWorld";
 import { useAudio } from "../audio/useAudio";
@@ -34,6 +34,13 @@ export default function DockControls({ onToggleRecent }: { onToggleRecent: () =>
     if (noticeTimer.current) clearTimeout(noticeTimer.current);
     noticeTimer.current = setTimeout(() => setNotice(""), 3500);
   };
+
+  // 落盘失败时显示通知（db.saveDebounced → CustomEvent "lj:save-error"）。
+  useEffect(() => {
+    const handler = () => showNotice("保存失败——内容可能没有写进本地存储，请导出备份");
+    window.addEventListener("lj:save-error", handler);
+    return () => window.removeEventListener("lj:save-error", handler);
+  }, []);
 
   const onExport = () => downloadWorld(world, entries, Date.now());
 

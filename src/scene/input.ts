@@ -10,6 +10,21 @@ const SENS = 0.0022;
 const TOUCH_SENS = 0.005;
 const PITCH_MAX = 1.18;
 
+/**
+ * 退出聚焦/望远镜的飞回动画进行中（PlayerControls 写、这里读）。
+ * 此窗口内 focusedZoneId/telescopeActive 已被 store 清掉，若不拦，点击画布会立刻抢回指针锁、
+ * 鼠标输入开始改写 yaw/pitch，而飞回收尾会用快照值覆盖——交还控制那帧视线跳向意外方向。
+ */
+export const camExitGate = { active: false };
+
+/** 事件来源是可编辑元素（输入框/文本域/下拉/富文本）——字母键属于打字，不属于走路。 */
+function isEditable(t: EventTarget | null): boolean {
+  const el = t as HTMLElement | null;
+  if (!el || !el.tagName) return false;
+  const tag = el.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable === true;
+}
+
 export interface WalkInput {
   yaw: RefObject<number>;
   pitch: RefObject<number>;
@@ -39,11 +54,21 @@ export function useWalkInput(canvas: HTMLCanvasElement, onPrimary: () => void): 
       pitch.current = THREE.MathUtils.clamp(pitch.current - e.movementY * SENS, -PITCH_MAX, PITCH_MAX);
     };
     const onKey = (down: boolean) => (e: KeyboardEvent) => {
-      if (e.code === "Escape" && down) {
+      // IME 合成中的 Esc 是"取消候选词"，不是"关面板"——不查 isComposing 会把拼音打到一半的
+      // 面板整个关掉、草稿全丢（keyCode 229 兜底不设 isComposing 的旧式输入法）。
+      if (e.code === "Escape" && down && !e.isComposing && e.keyCode !== 229) {
         const s = useWorld.getState();
-        if (s.focusedZoneId) { s.clearFocus(); return; }
+        if (s.focusedZoneId) {
+          // 有未保存草稿：先确认再关（editorDirty 由 useEntryForm 上报）。
+          if (s.editorDirty && !window.confirm("有未保存的内容，确定离开吗？")) return;
+          s.clearFocus();
+          return;
+        }
         if (s.telescopeActive) { s.closeTelescope(); return; }
       }
+      // 焦点在文本输入元素里：字母键属于打字，不进全局按键集（在 textarea 里敲 wasd ≠ 走路）。
+      // keyup 仍然放行删除——按着键把焦点移进输入框再松开，不能让按键卡在集合里。
+      if (down && isEditable(e.target)) return;
       if (down) keys.current.add(e.code);
       else keys.current.delete(e.code);
     };
@@ -65,6 +90,7 @@ export function useWalkInput(canvas: HTMLCanvasElement, onPrimary: () => void): 
         return;
       }
       if (s.focusedZoneId || s.telescopeActive) return; // 看记忆/聚焦时不抢指针锁
+      if (camExitGate.active) return; // 退出飞回动画中：不抢锁不交互（收尾会程序化回锁）
       if (isLocked()) onPrimaryRef.current();
       else canvas.requestPointerLock?.();
     };

@@ -23,19 +23,29 @@ export interface EntryFormOpts<D> {
 }
 
 export function useEntryForm<D>({ zoneId, type, empty, fromEntry, toPatch }: EntryFormOpts<D>) {
-  const selectedEntryId = useWorld((s) => s.selectedEntryId);
+  const setEditorDirty = useWorld((s) => s.setEditorDirty);
   const addEntry = useWorld((s) => s.addEntry);
   const updateEntry = useWorld((s) => s.updateEntry);
   const deleteEntry = useWorld((s) => s.deleteEntry);
   const selectEntry = useWorld((s) => s.selectEntry);
+  const selectedEntryId = useWorld((s) => s.selectedEntryId);
   const items = useZoneEntries(zoneId, type);
 
-  const [draft, setDraft] = useState<D>(empty);
+  const [draft, setDraftRaw] = useState<D>(empty);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // 回调/空值走 ref：不进 effect 依赖（面板每次 render 都会新建这些函数/对象字面量）。
   const opts = useRef({ empty, fromEntry, toPatch });
   opts.current = { empty, fromEntry, toPatch };
+
+  // 当前草稿的基线（空表单 or 正在编辑条目的原始内容），用于脏状态比较。
+  const baselineRef = useRef<D>(empty);
+
+  // 更新草稿并同步脏状态（草稿短，JSON 比较无性能顾虑）。
+  const setDraft = (d: D) => {
+    setDraftRaw(d);
+    setEditorDirty(JSON.stringify(d) !== JSON.stringify(baselineRef.current));
+  };
 
   useEffect(() => {
     if (!selectedEntryId) return;
@@ -43,15 +53,20 @@ export function useEntryForm<D>({ zoneId, type, empty, fromEntry, toPatch }: Ent
       .getState()
       .entries.find((x) => x.id === selectedEntryId && x.zoneId === zoneId && x.type === type);
     if (e) {
-      setDraft(opts.current.fromEntry(e));
+      const loaded = opts.current.fromEntry(e);
+      baselineRef.current = loaded;
+      setDraftRaw(loaded);      // 跳过脏检测，直接写原始数据
       setEditingId(e.id);
+      setEditorDirty(false);    // 刚载入时不脏
     }
-  }, [selectedEntryId, zoneId, type]);
+  }, [selectedEntryId, zoneId, type, setEditorDirty]);
 
   const reset = () => {
-    setDraft(opts.current.empty);
+    baselineRef.current = opts.current.empty;
+    setDraftRaw(opts.current.empty);
     setEditingId(null);
     selectEntry(null);
+    setEditorDirty(false);
   };
 
   const save = () => {
@@ -64,9 +79,34 @@ export function useEntryForm<D>({ zoneId, type, empty, fromEntry, toPatch }: Ent
 
   const remove = () => {
     if (!editingId) return;
+    if (!window.confirm("确定删除这条内容？删除后无法恢复。")) return;
     deleteEntry(editingId);
     reset();
   };
 
-  return { items, draft, setDraft, editingId, save, reset, remove, selectEntry };
+  // 列表点选时脏则确认，取消则不切换。
+  const handleSelectEntry = (id: string | null) => {
+    if (useWorld.getState().editorDirty) {
+      if (!window.confirm("当前有未保存的修改，切换后会丢失。继续？")) return;
+    }
+    selectEntry(id);
+  };
+
+  // Ctrl+S / Cmd+S 快捷保存；isComposing 时跳过（输入法组合中）。
+  // saveRef 保证监听器始终调用最新的 save 闭包，不进 effect 依赖。
+  const saveRef = useRef<() => void>(() => {});
+  saveRef.current = save;
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.isComposing) return;
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        saveRef.current();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
+
+  return { items, draft, setDraft, editingId, save, reset, remove, selectEntry: handleSelectEntry };
 }

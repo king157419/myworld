@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useAudio } from "../audio/useAudio";
 import { useEntryForm } from "./useEntryForm";
 import EntryList from "./EntryList";
@@ -21,6 +22,20 @@ export default function RecordPanel({ zoneId }: { zoneId: string }) {
       return title ? { title, body: d.body.trim() } : null;
     },
   });
+
+  const titleRef = useRef<HTMLInputElement>(null);
+
+  // 挂载时自动聚焦（不用 autoFocus，对滑入动画更稳）。
+  useEffect(() => { titleRef.current?.focus(); }, []);
+
+  // 切换到已有条目：聚焦并把光标移到文末。
+  useEffect(() => {
+    if (!editingId) return;
+    const el = titleRef.current;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, [editingId]);
 
   const musicPlaying = useAudio((s) => s.musicPlaying);
   const toggleMusic = useAudio((s) => s.toggleMusic);
@@ -78,7 +93,7 @@ export default function RecordPanel({ zoneId }: { zoneId: string }) {
 
         <label className="field">
           <span>歌名 / 曲目</span>
-          <input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="凌晨四点的萨克斯" />
+          <input ref={titleRef} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="凌晨四点的萨克斯" />
         </label>
         <label className="field">
           <span>它让你想起</span>
