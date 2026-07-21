@@ -1,4 +1,5 @@
 import type { Entry, Vec3, WorldConfig } from "../../config/types";
+import type { TrackMeta } from "../../audio/engine";
 import type { SceneData } from "../registryData";
 import { clamp, makeWalk } from "../walkKit";
 
@@ -54,6 +55,16 @@ export const SPOT = {
 };
 // 写字台：远端山墙窗前，偏 +X 一侧（让出正中approach 书墙的通道）。属 zone-bookshelf 的舞台道具。
 export const DESK: Vec3 = [1.05, Y_ATTIC, -10.35];
+
+// 阁楼唱机曲库：三首爵士（file 走 attic/ 子目录；CC BY 4.0，署名见 public/audio/CREDITS.md）。
+// 空间化在黑胶角唱机箱体处（走近变响），放完自动接续。数据放这儿（无 three）供场景音频档引用。
+export const ATTIC_TRACKS: TrackMeta[] = [
+  { id: "jazz-late-night-radio", title: "深夜电台", sub: "Kevin MacLeod (incompetech.com) · CC BY 4.0", file: "attic/jazz-late-night-radio.mp3" },
+  { id: "jazz-sidewalk-shade", title: "Sidewalk Shade", sub: "Kevin MacLeod (incompetech.com) · CC BY 4.0", file: "attic/jazz-sidewalk-shade.mp3" },
+  { id: "jazz-backbay-lounge", title: "Backbay Lounge", sub: "Kevin MacLeod (incompetech.com) · CC BY 4.0", file: "attic/jazz-backbay-lounge.mp3" },
+];
+// 唱机的空间化锚点（世界坐标）：黑胶角 SPOT.record 上唱机箱体处。
+export const ATTIC_MUSIC_POS: Vec3 = [SPOT.record[0], SPOT.record[1] + 0.86, SPOT.record[2]];
 
 const walk = makeWalk({
   support: (_x, z) => atticFloorY(z),
@@ -214,4 +225,6 @@ export const atticData: SceneData = {
     objects: { center: [2.5, Y_ATTIC + 0.75, -6.0], radius: 1.25 },
     record: { center: [-2.5, Y_ATTIC + 0.62, -6.0], radius: 1.15 },
   },
+  // 音频档：无水场景压掉水床；爵士曲库空间化在唱机位。
+  audio: { waterGain: 0, tracks: ATTIC_TRACKS, musicPos: ATTIC_MUSIC_POS },
 };

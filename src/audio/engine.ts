@@ -107,10 +107,12 @@ export class AudioEngine {
   private musicBus!: GainNode;
   private musicPanner!: PannerNode;
   private musicSource: AudioBufferSourceNode | null = null;
-  // 当前曲库（按场景可换：loft 夜曲 = 默认 TRACKS / attic 爵士）。loft 从不调用 setLibrary → 恒为 TRACKS。
+  // 当前曲库（按场景：loft 夜曲 / attic 爵士 / courtyard 古琴）。由 useSceneAudio 按场景档统一切换。
   private library: TrackMeta[] = TRACKS;
-  // 音乐空间化锚点（留声机/唱机所在世界坐标）。默认 loft 的 GRAMOPHONE；attic 换到唱机位。
+  // 音乐空间化锚点（留声机/唱机/古琴所在世界坐标）。默认 loft 的 GRAMOPHONE。
   private musicPos: Vec = GRAMOPHONE;
+  // 曲库响度配平（场景档 musicGain，默认 1）：开着音乐时音乐总线的目标增益。
+  private musicGain = 1;
   private trackData: (ArrayBuffer | null)[] = []; // null = 未加载或永久坏轨
   private decoded = new Map<number, AudioBuffer>();
   private playSeq = 0; // 播放请求令牌：快速连点切歌时只有最后一次生效
@@ -197,7 +199,7 @@ export class AudioEngine {
     await this.playFrom(this.currentIndex);
     if (this.musicOn) {
       this.musicBus.gain.cancelScheduledValues(ctx.currentTime);
-      this.musicBus.gain.setTargetAtTime(1, ctx.currentTime, 0.4);
+      this.musicBus.gain.setTargetAtTime(this.musicGain, ctx.currentTime, 0.4);
     }
   }
 
@@ -282,9 +284,9 @@ export class AudioEngine {
   setOnTrackChange(cb: (i: number, audible: boolean) => void): void { this.onTrackChange = cb; }
 
   /**
-   * 切换当前曲库（按场景：loft 夜曲=默认 TRACKS / attic 爵士）。同库引用即空操作；
-   * loft 从不调用 → 曲库行为零变化。最小加性接口：复用既有按需解码 / 自动接续 / 坏轨跳过 /
-   * 空间化留声机，只把 library 换一份并从头起播。未 start 时只记下，start() 会用最新 library。
+   * 切换当前曲库（按场景档：loft 夜曲 / attic 爵士 / courtyard 古琴）。同库引用即空操作
+   * （场景档里的 tracks 是模块级常量 → 重进同场景零开销）。复用既有按需解码 / 自动接续 /
+   * 坏轨跳过 / 空间化，只把 library 换一份并从头起播。未 start 时只记下，start() 会用最新 library。
    */
   async setLibrary(tracks: TrackMeta[]): Promise<void> {
     if (tracks === this.library) return;
@@ -301,12 +303,21 @@ export class AudioEngine {
     await this.playFrom(0);
     if (this.musicOn && this.ctx) {
       this.musicBus.gain.cancelScheduledValues(this.ctx.currentTime);
-      this.musicBus.gain.setTargetAtTime(1, this.ctx.currentTime, 0.4);
+      this.musicBus.gain.setTargetAtTime(this.musicGain, this.ctx.currentTime, 0.4);
     }
   }
 
-  /** 设音乐空间化锚点（留声机/唱机世界坐标）。按场景切换：loft 默认 GRAMOPHONE / attic 唱机位。
-   *  未 start 时先记下，start() 建 panner 时采用；loft 不调用 → 恒在 GRAMOPHONE。 */
+  /** 曲库响度配平（场景档 musicGain）。开着音乐时把总线增益渐变到新目标。 */
+  setMusicGain(v: number): void {
+    this.musicGain = v;
+    if (!this.ctx || !this.musicOn) return;
+    const t = this.ctx.currentTime;
+    this.musicBus.gain.cancelScheduledValues(t);
+    this.musicBus.gain.setTargetAtTime(v, t, 0.4);
+  }
+
+  /** 设音乐空间化锚点（留声机/唱机/古琴世界坐标），由场景档提供。
+   *  未 start 时先记下，start() 建 panner 时采用。 */
   setMusicPosition(pos: Vec): void {
     this.musicPos = pos;
     if (this.ctx && this.musicPanner) setPannerPos(this.musicPanner, pos[0], pos[1], pos[2], this.ctx.currentTime);
@@ -345,13 +356,13 @@ export class AudioEngine {
 
   // ── 控制 ──────────────────────────────────────────────────────────────
 
-  /** 开关音乐（渐入/渐出音乐总线增益）。 */
+  /** 开关音乐（渐入/渐出音乐总线增益；开到场景档配平的 musicGain）。 */
   setMusicPlaying(on: boolean): void {
     this.musicOn = on;
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     this.musicBus.gain.cancelScheduledValues(t);
-    this.musicBus.gain.setTargetAtTime(on ? 1 : 0, t, on ? 0.4 : 0.6);
+    this.musicBus.gain.setTargetAtTime(on ? this.musicGain : 0, t, on ? 0.4 : 0.6);
   }
 
   /**

@@ -1,8 +1,9 @@
 import type { SceneData } from "../registryData";
+import { audioEngine, TRACKS } from "../../audio/engine";
 import { defaultWorld } from "../../config/defaultWorld";
 import { makeSeed } from "../../data/seed";
 import { resolveMove } from "../../scene/walk";
-import { EYE, FOCUS, SPAWN, ZONE_ANCHORS } from "../../theme";
+import { EYE, FOCUS, GRAMOPHONE, SPAWN, ZONE_ANCHORS } from "../../theme";
 
 // 潮汐图书馆（loft）的场景数据 = 把现有实现原样包起来。
 // theme.ts 仍是 loft 的私有真相源（几何/锚点/聚焦）；walk.ts 仍是它的碰撞求解器。
@@ -19,4 +20,6 @@ export const loftData: SceneData = {
   walk: resolveMove,
   zoneAnchors: ZONE_ANCHORS,
   focus: FOCUS,
+  // 音频档：镜面水床 + 夜曲曲库空间化在留声机位（与旧行为逐一相同）。
+  audio: { waterGain: audioEngine.baseWaterGain, tracks: TRACKS, musicPos: GRAMOPHONE },
 };

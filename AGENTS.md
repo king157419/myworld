@@ -28,7 +28,7 @@
 - **多场景**（第十二轮）：`world.room.style` 即场景选择器——`loft`=潮汐图书馆（历史名）/ `attic`=雨夜阁楼 / `courtyard`=雾中山居。
   `src/scenes/registryData.ts`（数据层：defaultWorld/makeSeed/spawn/eye/walk/zoneAnchors/focus，无 three）+ `registry.ts`（拼 Stage）；
   每场景一份独立 SavedWorld（Dexie v2：worlds 按 style 键控、entries 带 scene 索引、meta.lastScene；旧 `main` 行已迁 `loft`）；
-  切换走 `useWorld.switchScene`（flushSave→load/seed→hydrate→瞬移 spawn）；按场景曲库 `engine.setLibrary`（加性，loft 默认曲库不变）。
+  切换走 `useWorld.switchScene`（flushSave→load/seed→hydrate→瞬移 spawn）；**场景音频档** `SceneData.audio`（水床增益/曲库/空间化锚点/响度配平）由 `audio/useSceneAudio` 订阅 room.style 统一应用——attic 爵士、courtyard 古琴都走空间化音乐总线，不再有各场景 mount/unmount 手动恢复 loft 的兜圈。
   **三 zone 契约每场景各守一份**；attic/courtyard 各有场景私有组件目录（`src/scenes/<style>/`，theme.ts 是 loft 私有真相源）。
 - 唯一几何真相源（loft）：`src/theme.ts` 的 LAYOUT（`R_COURT` 镜面广场 / `DECK`+`STEPS` 观星台坡道 / `PEDESTALS` 浮岛 / `BOOKWALL` 书墙弧 / `GRAMOPHONE` / `tideOffset`；`ZONE_ANCHORS`/`FOCUS` 按 **zone type** 索引——id 属于用户数据，可改名）。
 - 场景：`scene/Sky`（星空穹顶+银河+星点+月+地平线辉光带，水下镜像副本＝"星海倒影"底衬）、
@@ -41,7 +41,7 @@
 - DEV 验证：重种某场景种子=删 `worlds[style]` 行与该 scene 的 entries 后 `switchScene(style)`；截图走 `canvas.toDataURL`→本地接收器（**发 Blob 不发 dataURL 字符串**），preview_screenshot 的合成器在隐藏页不可信；`localStorage.lj_quality="high"|"low"` 钉死画质（自动化页签 rAF 节流会让 PerformanceMonitor 误判降级，不钉死验不到高画质路径）；DevBridge 暴露 `__lj`/`__ljStore`/`__ljAudio`/`__ljExport`(烘焙导出)/`__freecam`(放开相机)。⚠ 自动化驱动 store 一律用 UI 同款调用形状（`setMood` 要完整对象——传字符串会把非法数据 persist 进 IndexedDB）。
 - 数据/持久化（**沿用，未改契约**）：`store/useWorld`、`config/types`(联合类型由 const 数组派生，io 校验同源)、`config/moods.ts`(心境→氛围唯一真相源)、`data/io`(校验往返)、`data/db`(IndexedDB)、`data/seed`(首次种子)。
 - 数据驱动渲染：`scene/zones/*`（书脊由思考点亮、物件按 primitive/color 生成、唱片机转碟绑 `useAudio.musicPlaying`）。
-- 音频：`audio/engine.ts`（水声独立起播；曲库压缩字节常驻、PCM 按需解码只留当前+下一首；坏轨自动跳；远雷合成）+ `audio/useAudio`（UI 镜像，换曲以引擎回调为准）。
+- 音频：`audio/engine.ts`（水声独立起播；曲库压缩字节常驻、PCM 按需解码只留当前+下一首；坏轨自动跳；远雷合成；musicGain 库级响度配平）+ `audio/useAudio`（UI 镜像，换曲以引擎回调为准）+ `audio/useSceneAudio`（场景音频档唯一应用点，挂 App 层）。曲目文件与场景档不变量有测试把守（`scenes/sceneAudio.test.ts`）。
 - UI：`ui/Hud`（纯编排）+ `EnterOverlay`/`Reticle`/`DockControls`；三面板共用 `ui/useEntryForm` 表单生命周期。
 - 后处理：`scene/PostFX`（SMAA + Bloom + 色彩分级 + AgX + 暗角 + 轻颗粒；无 DOF——第一人称走动里太贵）。
 

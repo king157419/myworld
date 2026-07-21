@@ -11,7 +11,7 @@ import { COURT_PALETTE, woodMat, woodWarmMat } from "./materials";
 
 // 琴音 · 影音（zone-record）：本场景的「唱机」是一张古琴。契约 type=record 不变，皮肤换成古琴——
 // 播放时（useAudio.musicPlaying）琴弦泛起微光并轻颤（收敛，不像灯管——场景 A 教训）。
-// 琴音曲库《平沙落雁》的接线在 useCourtyardAudio；此处只做视觉与聚焦登记。
+// 琴音曲库《平沙落雁》走场景音频档（data.ts COURTYARD_TRACKS → engine 空间化总线 @ 琴位）；此处只做视觉与聚焦登记。
 
 const lacquerMat = new THREE.MeshStandardMaterial({ color: "#241c16", roughness: 0.42, metalness: 0.12 });
 

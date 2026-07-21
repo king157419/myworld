@@ -13,7 +13,7 @@ import AtticRecordCorner from "./RecordCorner";
 import { GableWindow, Skylight } from "./Glass";
 import { makeRainGlassMaterial } from "./rainGlass";
 import { useAtticRain } from "./useAtticRain";
-import { StairCreak, useAtticLibrary, useVinylCrackle } from "./atticAudio";
+import { StairCreak, useVinylCrackle } from "./atticAudio";
 import { ATTIC_PALETTE } from "./materials";
 
 // 雨夜阁楼 · v1 成品舞台。
@@ -141,10 +141,9 @@ export default function AtticStage({ low }: { low: boolean }) {
     timeUniform.value = s.clock.elapsedTime;
   });
 
-  // 室内雨声床（随 useAudio.started 起停 + 压掉 loft 水床；音量随心境）。
+  // 室内雨声床（随 useAudio.started 起停；音量随心境）。曲库/水床由场景音频档统一切换。
   useAtticRain(cfg.rainVol);
-  // 唱机曲库切爵士（离场恢复 loft）+ musicPlaying 时叠黑胶底噪。
-  useAtticLibrary();
+  // musicPlaying 时叠黑胶底噪。
   useVinylCrackle();
 
   // 天窗定向（两坡各一，错开 Z）。

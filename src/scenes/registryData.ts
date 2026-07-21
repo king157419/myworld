@@ -1,4 +1,5 @@
 import type { Entry, RoomStyle, Vec3, WorldConfig, ZoneType } from "../config/types";
+import type { TrackMeta } from "../audio/engine";
 import type { WalkFn } from "./walkKit";
 import { loftData } from "./loft/data";
 import { atticData } from "./attic/data";
@@ -26,6 +27,22 @@ export interface FocusSphere {
   radius: number;
 }
 
+/**
+ * 场景音频档：进入该场景时由 useSceneAudio 统一应用（引擎三旋钮：水床增益 / 音乐总线曲库 /
+ * 空间化锚点）。取代旧的"各场景 mount 改、unmount 恢复 loft"模式——那个模式在三场景两两
+ * 切换时会经由 loft 兜一圈（白白重拉曲库字节、瞬时错位）。这里只是数据，应用方在 audio 层。
+ */
+export interface SceneAudio {
+  /** 环境水床增益（loft 的镜面水 0.22；无水场景 0）。 */
+  waterGain: number;
+  /** 音乐总线曲库（空间化在 musicPos，走近变响；RecordPanel 曲目单同步展示）。 */
+  tracks: TrackMeta[];
+  /** 音乐空间化锚点（留声机/唱机/古琴的世界坐标）。 */
+  musicPos: Vec3;
+  /** 曲库响度配平（不同来源录音响度不一，默认 1）。 */
+  musicGain?: number;
+}
+
 /** 一个场景 = 一份独立世界（可各自导出导入重建）+ 走动/聚焦/内容所需的一切数据。 */
 export interface SceneData {
   style: RoomStyle;
@@ -47,6 +64,8 @@ export interface SceneData {
   zoneAnchors: Record<ZoneType, ZoneAnchor>;
   /** 聚焦取景包围球（按 zone.type 索引）。 */
   focus: Record<ZoneType, FocusSphere>;
+  /** 场景音频档（水床/曲库/空间化锚点），进场时统一应用。 */
+  audio: SceneAudio;
 }
 
 /** UI 展示顺序 / 已接场景集合（study 预留未接，不在此列）。 */

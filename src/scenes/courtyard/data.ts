@@ -1,4 +1,5 @@
-import type { Entry, WorldConfig } from "../../config/types";
+import type { Entry, Vec3, WorldConfig } from "../../config/types";
+import type { TrackMeta } from "../../audio/engine";
 import type { SceneData } from "../registryData";
 import { clamp, makeWalk } from "../walkKit";
 import {
@@ -147,6 +148,15 @@ function makeSeed(now: number): Entry[] {
   }));
 }
 
+// 书房古琴曲库：单曲《平沙落雁》（CC BY 2.5，署名见 public/audio/courtyard/CREDITS.md）。
+// 走 engine 音乐总线 → HRTF 空间化在古琴位（走近变响），单曲放完自动接续（engine 循环回自身）。
+// 之前古琴走平面 HTMLAudioElement，且 loft 夜曲总线仍在背后播放（跨场景渗音）——现统一进总线。
+export const COURTYARD_TRACKS: TrackMeta[] = [
+  { id: "guqin-pingsha-luoyan", title: "平沙落雁", sub: "古琴独奏 · CharlieHuang（CC BY 2.5）", file: "courtyard/guqin-pingsha-luoyan.ogg" },
+];
+// 古琴的空间化锚点（世界坐标）：东内墙古琴位，琴身高度。
+export const COURTYARD_MUSIC_POS: Vec3 = [SPOT.record[0], SPOT.record[1] + 0.55, SPOT.record[2]];
+
 export const courtyardData: SceneData = {
   style: "courtyard",
   label: "雾中山居",
@@ -166,4 +176,7 @@ export const courtyardData: SceneData = {
     objects: FOCUS.objects,
     record: FOCUS.record,
   },
+  // 音频档：无水场景压掉水床；古琴单曲库空间化在琴位。
+  // musicGain 0.75：维基原始录音比夜曲/爵士母带响，压一点配平（主人验听可调）。
+  audio: { waterGain: 0, tracks: COURTYARD_TRACKS, musicPos: COURTYARD_MUSIC_POS, musicGain: 0.75 },
 };

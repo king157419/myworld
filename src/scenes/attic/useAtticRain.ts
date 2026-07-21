@@ -1,11 +1,9 @@
 import { useEffect, useRef } from "react";
 import { useAudio } from "../../audio/useAudio";
-import { audioEngine } from "../../audio/engine";
 
 // 雨夜阁楼的室内雨声床：进 attic 且已开声场 → 循环播放「关窗室内听大雨」，离开（Stage 卸载）→ 停。
 // 用独立 HTMLAudioElement 挂在 Stage 里（不动 engine 核心的音乐/水声图），跟随 useAudio.started。
-// 同时把 loft 的镜面水床压到 0（attic 不在水上），离场恢复——切场景切环境声的最小实现。
-// 正式的雨声空间化 / 爵士曲库 / 黑胶底噪接线留给下一 wave。
+// （loft 水床的压/放已并入场景音频档，由 audio/useSceneAudio 统一应用，此处不再手动切。）
 
 function rainUrl(): string {
   const base = import.meta.env.BASE_URL ?? "/";
@@ -21,10 +19,9 @@ export function useAtticRain(volume: number) {
   const volRef = useRef(volume);
   volRef.current = volume;
 
-  // 起播 / 停播：只在「已开声场」翻真时建元素；Stage 卸载时停 + 复原水声。
+  // 起播 / 停播：只在「已开声场」翻真时建元素；Stage 卸载时停。
   useEffect(() => {
     if (!started) return;
-    audioEngine.setWaterGain(0); // 压掉 loft 水床
     let alive = true;
     const el = new Audio(rainUrl());
     el.loop = true;
@@ -48,7 +45,6 @@ export function useAtticRain(volume: number) {
         el.src = "";
       } catch { /* ignore */ }
       elRef.current = null;
-      audioEngine.setWaterGain(audioEngine.baseWaterGain); // 恢复水床，交还给 loft
     };
   }, [started]); // eslint-disable-line react-hooks/exhaustive-deps
 

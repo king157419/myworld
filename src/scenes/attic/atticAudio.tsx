@@ -1,46 +1,20 @@
 import { useEffect, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useAudio } from "../../audio/useAudio";
-import { audioEngine, TRACKS, type TrackMeta } from "../../audio/engine";
-import { GRAMOPHONE } from "../../theme";
 import { useWorld } from "../../store/useWorld";
-import { SPOT } from "./data";
 
-// 雨夜阁楼的声音接线（上一 wave 留下的收尾）：
-//   1) 唱机曲库换成三首 Kevin MacLeod 爵士（CC BY 4.0，署名见 public/audio/CREDITS.md）——
-//      走 engine 既有曲库机制（按需解码 / 自动接续 / 坏轨跳过 / 空间化留声机），离场恢复 loft 夜曲。
-//   2) musicPlaying 时叠加低音量黑胶底噪 vinyl-crackle（CC0）循环。
-//   3) 行走经过第 7 级踏步区间触发一次木地板吱呀（floor-creak，CC0），防抖、重复经过再响不连发——
+// 雨夜阁楼的声音接线：
+//   1) musicPlaying 时叠加低音量黑胶底噪 vinyl-crackle（CC0）循环。
+//   2) 行走经过第 7 级踏步区间触发一次木地板吱呀（floor-creak，CC0），防抖、重复经过再响不连发——
 //      对应个人印记 attic-t5「第七级楼梯会响」的彩蛋。
+// （爵士曲库/唱机空间化锚点已并入场景音频档：data.ts 的 ATTIC_TRACKS/ATTIC_MUSIC_POS，
+//   由 audio/useSceneAudio 按场景统一应用——不再在 mount/unmount 里手动切换与恢复。）
 
 /** public/audio/attic/ 下相对路径拼 BASE_URL（兼容 dev / 生产子路径）。 */
 function atticAudioUrl(file: string): string {
   const base = import.meta.env.BASE_URL ?? "/";
   const b = base.endsWith("/") ? base : `${base}/`;
   return `${b}audio/attic/${file}`;
-}
-
-// 阁楼唱机曲库：三首爵士（file 走 attic/ 子目录）。空间化在 GRAMOPHONE 位（走近变响），放完自动接续。
-export const ATTIC_TRACKS: TrackMeta[] = [
-  { id: "jazz-late-night-radio", title: "深夜电台", sub: "Kevin MacLeod (incompetech.com) · CC BY 4.0", file: "attic/jazz-late-night-radio.mp3" },
-  { id: "jazz-sidewalk-shade", title: "Sidewalk Shade", sub: "Kevin MacLeod (incompetech.com) · CC BY 4.0", file: "attic/jazz-sidewalk-shade.mp3" },
-  { id: "jazz-backbay-lounge", title: "Backbay Lounge", sub: "Kevin MacLeod (incompetech.com) · CC BY 4.0", file: "attic/jazz-backbay-lounge.mp3" },
-];
-
-// 唱机的空间化锚点（世界坐标）：黑胶角 SPOT.record 上唱机箱体处，走近才变响。
-const ATTIC_MUSIC_POS: [number, number, number] = [SPOT.record[0], SPOT.record[1] + 0.86, SPOT.record[2]];
-
-/** 进 attic → 唱机曲库切爵士 + 空间化到唱机位；离场（Stage 卸载）→ 恢复 loft 默认夜曲 + 留声机位。 */
-export function useAtticLibrary(): void {
-  const setLibrary = useAudio((s) => s.setLibrary);
-  useEffect(() => {
-    setLibrary(ATTIC_TRACKS);
-    audioEngine.setMusicPosition(ATTIC_MUSIC_POS);
-    return () => {
-      setLibrary(TRACKS);
-      audioEngine.setMusicPosition(GRAMOPHONE);
-    };
-  }, [setLibrary]);
 }
 
 /** 黑胶底噪：musicPlaying（且已开声场、未静音）时叠一层低音量 crackle 循环。 */
