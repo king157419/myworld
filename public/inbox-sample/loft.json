@@ -1,0 +1,73 @@
+{
+  "format": "lingjing.entries.v1",
+  "_comment": "线上演示内容（非私人，入库公开）。仅在生产构建且私人收件箱缺席时被吸收（见 src/data/inbox.ts）——也就是只有 Vercel 上的来客会看到。时间戳刻意拉开跨度，让望远镜的潮汐纪元有层次。",
+  "entries": [
+    {
+      "id": "sample-t1",
+      "zoneId": "zone-bookshelf",
+      "type": "thought",
+      "title": "写给来客",
+      "body": "你正站在一座演示用的图书馆里。真正的馆主把日记留在了自己的机器上——这里陈列的，是几页公开的样章。走近书墙，字会亮；写下什么，它会沉进水里，随潮汐起落。",
+      "createdAt": 1767225600000,
+      "updatedAt": 1767225600000
+    },
+    {
+      "id": "sample-t2",
+      "zoneId": "zone-bookshelf",
+      "type": "thought",
+      "title": "关于星海",
+      "body": "水只有几厘米深，却装下了整片星空。很多事情大概也是这样：看起来深不见底的，其实是倒影；看起来只是倒影的，踩上去会荡开真实的涟漪。",
+      "createdAt": 1770595200000,
+      "updatedAt": 1770595200000
+    },
+    {
+      "id": "sample-t3",
+      "zoneId": "zone-bookshelf",
+      "type": "thought",
+      "title": "潮汐的用处",
+      "body": "涨潮的时候，旧的字沉得更深；退潮的时候，它们又露出来。图书馆不删除任何东西，它只是让时间决定你今天能看见哪一层。",
+      "createdAt": 1774051200000,
+      "updatedAt": 1774051200000
+    },
+    {
+      "id": "sample-o1",
+      "zoneId": "zone-objects",
+      "type": "object",
+      "title": "一枚方形的镇纸",
+      "body": "压住会被夜风翻走的那一页。演示世界里的物件都是几何体——你的世界里，它们可以是任何你舍不得丢的东西。",
+      "primitive": "box",
+      "color": "#b8895a",
+      "createdAt": 1772064000000,
+      "updatedAt": 1772064000000
+    },
+    {
+      "id": "sample-o2",
+      "zoneId": "zone-objects",
+      "type": "object",
+      "title": "捡来的浮球",
+      "body": "涨潮夜从水面上捞的。里面好像还亮着一点谁家的灯。",
+      "primitive": "sphere",
+      "color": "#7fb4c9",
+      "createdAt": 1775692800000,
+      "updatedAt": 1775692800000
+    },
+    {
+      "id": "sample-r1",
+      "zoneId": "zone-record",
+      "type": "track",
+      "title": "夜曲 · 作品9之2",
+      "body": "留声机的默认曲目。走近一点，声音会从那只铜喇叭里来——不是从你的耳机正中间。",
+      "createdAt": 1768867200000,
+      "updatedAt": 1768867200000
+    },
+    {
+      "id": "sample-r2",
+      "zoneId": "zone-record",
+      "type": "track",
+      "title": "Gymnopédie No.1",
+      "body": "适合退潮。琴键落下的间隔，和水退开的速度差不多。",
+      "createdAt": 1777075200000,
+      "updatedAt": 1777075200000
+    }
+  ]
+}
